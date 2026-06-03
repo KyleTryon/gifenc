@@ -33,7 +33,9 @@ const MASKS = [
 function tableCode(table: Int32Buffer, index: number): number {
   const code = table[index];
   if (code == null) {
-    throw new Error(`lzwEncode() expected table code at index ${index}`);
+    throw new Error(
+      `lzwEncode() expected table code at index ${String(index)}`,
+    );
   }
   return code;
 }

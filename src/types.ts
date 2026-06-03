@@ -2,11 +2,11 @@ export type Format = "rgb565" | "rgb444" | "rgba4444";
 
 export type DitherAlgorithm = "floyd-steinberg";
 
-export type ByteArray = Uint8Array<ArrayBufferLike>;
+export type ByteArray = Uint8Array;
 
-export type ClampedByteArray = Uint8ClampedArray<ArrayBufferLike>;
+export type ClampedByteArray = Uint8ClampedArray;
 
-export type Int32Buffer = Int32Array<ArrayBufferLike>;
+export type Int32Buffer = Int32Array;
 
 export type RGBAInput = ByteArray | ClampedByteArray;
 

@@ -24,7 +24,7 @@ export function colorDifferenceYIQSquared(
 function channel(array: readonly number[], index: number): number {
   const value = array[index];
   if (value == null) {
-    throw new Error(`Expected color channel ${index}`);
+    throw new Error(`Expected color channel ${String(index)}`);
   }
   return value;
 }

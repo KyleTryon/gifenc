@@ -41,7 +41,7 @@ function sqr(value: number): number {
 function uint32At(data: Uint32Array, index: number): number {
   const value = data[index];
   if (value == null) {
-    throw new Error(`Expected uint32 pixel at index ${index}`);
+    throw new Error(`Expected uint32 pixel at index ${String(index)}`);
   }
   return value;
 }
@@ -49,7 +49,7 @@ function uint32At(data: Uint32Array, index: number): number {
 function binAt(bins: BinList, index: number): Bin {
   const bin = bins[index];
   if (!bin) {
-    throw new Error(`Expected quantization bin at index ${index}`);
+    throw new Error(`Expected quantization bin at index ${String(index)}`);
   }
   return bin;
 }
@@ -57,7 +57,7 @@ function binAt(bins: BinList, index: number): Bin {
 function heapAt(heap: Uint32Array, index: number): number {
   const value = heap[index];
   if (value == null) {
-    throw new Error(`Expected heap value at index ${index}`);
+    throw new Error(`Expected heap value at index ${String(index)}`);
   }
   return value;
 }
@@ -65,7 +65,7 @@ function heapAt(heap: Uint32Array, index: number): number {
 function channel(color: readonly number[], index: number): number {
   const value = color[index];
   if (value == null) {
-    throw new Error(`Expected color channel ${index}`);
+    throw new Error(`Expected color channel ${String(index)}`);
   }
   return value;
 }
@@ -125,7 +125,7 @@ function createBin(): Bin {
 
 function createBinList(data: Uint32Array, format: Format): BinList {
   const bincount = format === "rgb444" ? 4096 : 65536;
-  const bins: BinList = new Array(bincount);
+  const bins: BinList = new Array<Bin | undefined>(bincount);
   const size = data.length;
 
   /* Build histogram */
@@ -196,9 +196,6 @@ export default function quantize(
     oneBitAlpha = false,
   } = opts;
 
-  if (!rgba || !rgba.buffer) {
-    throw new Error("quantize() expected RGBA Uint8Array data");
-  }
   if (!(rgba instanceof Uint8Array) && !(rgba instanceof Uint8ClampedArray)) {
     throw new Error("quantize() expected RGBA Uint8Array data");
   }

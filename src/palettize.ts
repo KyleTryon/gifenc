@@ -32,7 +32,7 @@ function roundStep(byte: number, step: number): number {
 function uint32At(data: Uint32Array, index: number): number {
   const value = data[index];
   if (value == null) {
-    throw new Error(`Expected uint32 pixel at index ${index}`);
+    throw new Error(`Expected uint32 pixel at index ${String(index)}`);
   }
   return value;
 }
@@ -40,7 +40,7 @@ function uint32At(data: Uint32Array, index: number): number {
 function byteAt(data: RGBAInput, index: number): number {
   const value = data[index];
   if (value == null) {
-    throw new Error(`Expected RGBA byte at index ${index}`);
+    throw new Error(`Expected RGBA byte at index ${String(index)}`);
   }
   return value;
 }
@@ -48,7 +48,7 @@ function byteAt(data: RGBAInput, index: number): number {
 function colorAt(colors: Palette, index: number): number[] {
   const color = colors[index];
   if (!color) {
-    throw new Error(`Expected palette color at index ${index}`);
+    throw new Error(`Expected palette color at index ${String(index)}`);
   }
   return color;
 }
@@ -60,7 +60,7 @@ function colorChannel(
 ): number {
   const value = color[index] ?? fallback;
   if (value == null) {
-    throw new Error(`Expected color channel ${index}`);
+    throw new Error(`Expected color channel ${String(index)}`);
   }
   return value;
 }
@@ -70,6 +70,19 @@ const green = (color: readonly number[]): number => colorChannel(color, 1);
 const blue = (color: readonly number[]): number => colorChannel(color, 2);
 const alpha = (color: readonly number[]): number =>
   colorChannel(color, 3, 0xff);
+
+function describeValue(value: unknown): string {
+  if (
+    value == null ||
+    typeof value === "string" ||
+    typeof value === "number" ||
+    typeof value === "boolean"
+  ) {
+    return String(value);
+  }
+
+  return Object.prototype.toString.call(value);
+}
 
 export function prequantize(
   rgba: RGBAInput,
@@ -105,9 +118,6 @@ export function applyPalette(
   palette: Palette,
   options: Format | ApplyPaletteOptions | null = "rgb565",
 ): Uint8Array {
-  if (!rgba || !rgba.buffer) {
-    throw new Error("applyPalette() expected RGBA Uint8Array data");
-  }
   if (!(rgba instanceof Uint8Array) && !(rgba instanceof Uint8ClampedArray)) {
     throw new Error("applyPalette() expected RGBA Uint8Array data");
   }
@@ -125,7 +135,9 @@ export function applyPalette(
   const length = data.length;
   const bincount = format === "rgb444" ? 4096 : 65536;
   const index = new Uint8Array(length);
-  const cache: number[] = new Array(bincount);
+  const cache: Array<number | undefined> = new Array<number | undefined>(
+    bincount,
+  );
 
   // Some duplicate code below due to very hot code path
   // Introducing branching/conditions shows some significant impact
@@ -192,17 +204,22 @@ function normalizeApplyPaletteOptions(
     );
   }
 
-  const dither = options.dither === true ? "floyd-steinberg" : options.dither;
-  if (dither && dither !== "floyd-steinberg") {
+  const rawDither: unknown = options.dither;
+  let dither: DitherAlgorithm | false = false;
+  if (rawDither === true || rawDither === "floyd-steinberg") {
+    dither = "floyd-steinberg";
+  } else if (rawDither) {
     throw new Error(
-      `applyPalette() unsupported dither algorithm: ${options.dither}`,
+      `applyPalette() unsupported dither algorithm: ${describeValue(
+        rawDither,
+      )}`,
     );
   }
 
   let ditherStrength = 1;
   if (dither) {
-    ditherStrength =
-      options.ditherStrength == null ? 1 : Number(options.ditherStrength);
+    const rawDitherStrength: unknown = options.ditherStrength;
+    ditherStrength = rawDitherStrength == null ? 1 : Number(rawDitherStrength);
     if (!Number.isFinite(ditherStrength)) {
       throw new Error("applyPalette() expected ditherStrength to be a number");
     }
