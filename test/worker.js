@@ -1,4 +1,4 @@
-import { GIFEncoder, quantize, applyPalette } from "/src/index.js";
+import { GIFEncoder, quantize, applyPalette } from "/dist/gifenc.mjs";
 
 let options;
 

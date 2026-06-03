@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -27,7 +27,7 @@
     <div id="progress"></div>
     <canvas></canvas>
     <script type="module">
-      import { GIFEncoder, quantize, applyPalette } from "/src/index.js";
+      import { GIFEncoder, quantize, applyPalette } from "/dist/gifenc.mjs";
 
       const workerUrl = "/test/worker.js";
 
@@ -282,7 +282,7 @@
             x - length / 2,
             y - thickness / 2,
             length,
-            thickness
+            thickness,
           );
           context.restore();
         }

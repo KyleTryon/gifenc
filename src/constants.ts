@@ -1,4 +1,4 @@
-export default {
+const constants = {
   signature: "GIF",
   version: "89a",
   trailer: 0x3b,
@@ -25,4 +25,6 @@ export default {
   interlaceFlagMask: 0b01000000,
   idSortFlagMask: 0b00100000,
   localColorTableSizeMask: 0b00000111,
-};
+} as const;
+
+export default constants;

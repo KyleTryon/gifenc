@@ -1,4 +1,6 @@
-export default function createStream(initialCapacity = 256) {
+import type { ByteArray, ByteStream } from "./types.js";
+
+export default function createStream(initialCapacity = 256): ByteStream {
   let cursor = 0;
   let contents = new Uint8Array(initialCapacity);
 
@@ -15,31 +17,31 @@ export default function createStream(initialCapacity = 256) {
     bytes() {
       return contents.slice(0, cursor);
     },
-    writeByte(byte) {
+    writeByte(byte: number) {
       expand(cursor + 1);
       contents[cursor] = byte;
       cursor++;
     },
-    writeBytes(data, offset = 0, byteLength = data.length) {
+    writeBytes(data: ArrayLike<number>, offset = 0, byteLength = data.length) {
       expand(cursor + byteLength);
       for (let i = 0; i < byteLength; i++) {
         contents[cursor++] = data[i + offset];
       }
     },
-    writeBytesView(data, offset = 0, byteLength = data.byteLength) {
+    writeBytesView(data: ByteArray, offset = 0, byteLength = data.byteLength) {
       expand(cursor + byteLength);
       contents.set(data.subarray(offset, offset + byteLength), cursor);
       cursor += byteLength;
     },
   };
 
-  function expand(newCapacity) {
-    var prevCapacity = contents.length;
+  function expand(newCapacity: number) {
+    const prevCapacity = contents.length;
     if (prevCapacity >= newCapacity) return; // No need to expand, the storage was already large enough.
     // Don't expand strictly to the given requested limit if it's only a very small increase, but instead geometrically grow capacity.
     // For small filesizes (<1MB), perform size*2 geometric increase, but for large sizes, do a much more conservative size*1.125 increase to
     // avoid overshooting the allocation cap by a very large margin.
-    var CAPACITY_DOUBLING_MAX = 1024 * 1024;
+    const CAPACITY_DOUBLING_MAX = 1024 * 1024;
     newCapacity = Math.max(
       newCapacity,
       (prevCapacity * (prevCapacity < CAPACITY_DOUBLING_MAX ? 2.0 : 1.125)) >>>

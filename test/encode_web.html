@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -22,7 +22,7 @@
     </p>
     <canvas></canvas>
     <script type="module">
-      import { GIFEncoder, quantize, applyPalette } from "/src/index.js";
+      import { GIFEncoder, quantize, applyPalette } from "/dist/gifenc.mjs";
 
       encode();
 
@@ -162,7 +162,7 @@
             x - length / 2,
             y - thickness / 2,
             length,
-            thickness
+            thickness,
           );
           context.restore();
         }

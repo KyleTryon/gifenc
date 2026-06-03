@@ -6,14 +6,37 @@ import {
 
 import { euclideanDistanceSquared } from "./color.js";
 
-function roundStep(byte, step) {
+import type {
+  ApplyPaletteOptions,
+  DitherAlgorithm,
+  DistanceFn,
+  Format,
+  Palette,
+  PrequantizeOptions,
+  RGBAInput,
+} from "./types.js";
+
+type NormalizedApplyPaletteOptions = {
+  format: Format;
+  dither: DitherAlgorithm | false;
+  width: number | undefined;
+  height: number | undefined;
+  ditherStrength: number;
+  serpentine: boolean;
+};
+
+function roundStep(byte: number, step: number): number {
   return step > 1 ? Math.round(byte / step) * step : byte;
 }
 
 export function prequantize(
-  rgba,
-  { roundRGB = 5, roundAlpha = 10, oneBitAlpha = null } = {},
-) {
+  rgba: RGBAInput,
+  {
+    roundRGB = 5,
+    roundAlpha = 10,
+    oneBitAlpha = null,
+  }: PrequantizeOptions = {},
+): void {
   const data = new Uint32Array(rgba.buffer);
   for (let i = 0; i < data.length; i++) {
     const color = data[i];
@@ -35,7 +58,11 @@ export function prequantize(
   }
 }
 
-export function applyPalette(rgba, palette, options = "rgb565") {
+export function applyPalette(
+  rgba: RGBAInput,
+  palette: Palette,
+  options: Format | ApplyPaletteOptions | null = "rgb565",
+): Uint8Array {
   if (!rgba || !rgba.buffer) {
     throw new Error("applyPalette() expected RGBA Uint8Array data");
   }
@@ -56,8 +83,7 @@ export function applyPalette(rgba, palette, options = "rgb565") {
   const length = data.length;
   const bincount = format === "rgb444" ? 4096 : 65536;
   const index = new Uint8Array(length);
-  const cache = new Array(bincount);
-  const hasAlpha = format === "rgba4444";
+  const cache: number[] = new Array(bincount);
 
   // Some duplicate code below due to very hot code path
   // Introducing branching/conditions shows some significant impact
@@ -69,10 +95,10 @@ export function applyPalette(rgba, palette, options = "rgb565") {
       const g = (color >> 8) & 0xff;
       const r = color & 0xff;
       const key = rgba8888_to_rgba4444(r, g, b, a);
-      const idx =
-        key in cache
-          ? cache[key]
-          : (cache[key] = nearestColorIndexRGBA(r, g, b, a, palette));
+      let idx = cache[key];
+      if (idx == null) {
+        idx = cache[key] = nearestColorIndexRGBA(r, g, b, a, palette);
+      }
       index[i] = idx;
     }
   } else {
@@ -84,10 +110,10 @@ export function applyPalette(rgba, palette, options = "rgb565") {
       const g = (color >> 8) & 0xff;
       const r = color & 0xff;
       const key = rgb888_to_key(r, g, b);
-      const idx =
-        key in cache
-          ? cache[key]
-          : (cache[key] = nearestColorIndexRGB(r, g, b, palette));
+      let idx = cache[key];
+      if (idx == null) {
+        idx = cache[key] = nearestColorIndexRGB(r, g, b, palette);
+      }
       index[i] = idx;
     }
   }
@@ -95,12 +121,28 @@ export function applyPalette(rgba, palette, options = "rgb565") {
   return index;
 }
 
-function normalizeApplyPaletteOptions(options) {
+function normalizeApplyPaletteOptions(
+  options: Format | ApplyPaletteOptions | null,
+): NormalizedApplyPaletteOptions {
   if (typeof options === "string") {
-    return { format: options, dither: false };
+    return {
+      format: options,
+      dither: false,
+      width: undefined,
+      height: undefined,
+      ditherStrength: 1,
+      serpentine: true,
+    };
   }
   if (options == null) {
-    return { format: "rgb565", dither: false };
+    return {
+      format: "rgb565",
+      dither: false,
+      width: undefined,
+      height: undefined,
+      ditherStrength: 1,
+      serpentine: true,
+    };
   }
   if (typeof options !== "object") {
     throw new Error(
@@ -134,7 +176,11 @@ function normalizeApplyPaletteOptions(options) {
   };
 }
 
-function applyPaletteDither(rgba, palette, opts) {
+function applyPaletteDither(
+  rgba: RGBAInput,
+  palette: Palette,
+  opts: NormalizedApplyPaletteOptions,
+): Uint8Array {
   const { format, width, height, ditherStrength, serpentine } = opts;
   const length = rgba.length / 4;
   if (length !== Math.floor(length)) {
@@ -212,19 +258,19 @@ function applyPaletteDither(rgba, palette, opts) {
 }
 
 function diffuseError(
-  pixels,
-  channels,
-  width,
-  height,
-  x,
-  y,
-  reverse,
-  strength,
-  er,
-  eg,
-  eb,
-  ea,
-) {
+  pixels: Float32Array,
+  channels: number,
+  width: number,
+  height: number,
+  x: number,
+  y: number,
+  reverse: boolean,
+  strength: number,
+  er: number,
+  eg: number,
+  eb: number,
+  ea: number,
+): void {
   const direction = reverse ? -1 : 1;
   addError(
     pixels,
@@ -281,18 +327,18 @@ function diffuseError(
 }
 
 function addError(
-  pixels,
-  channels,
-  width,
-  height,
-  x,
-  y,
-  er,
-  eg,
-  eb,
-  ea,
-  amount,
-) {
+  pixels: Float32Array,
+  channels: number,
+  width: number,
+  height: number,
+  x: number,
+  y: number,
+  er: number,
+  eg: number,
+  eb: number,
+  ea: number,
+  amount: number,
+): void {
   if (x < 0 || x >= width || y < 0 || y >= height) return;
   const idx = (y * width + x) * channels;
   pixels[idx] += er * amount;
@@ -301,11 +347,17 @@ function addError(
   if (channels === 4) pixels[idx + 3] += ea * amount;
 }
 
-function clampByte(value) {
+function clampByte(value: number): number {
   return value < 0 ? 0 : value > 0xff ? 0xff : Math.round(value);
 }
 
-function nearestColorIndexRGBA(r, g, b, a, palette) {
+function nearestColorIndexRGBA(
+  r: number,
+  g: number,
+  b: number,
+  a: number,
+  palette: Palette,
+): number {
   let k = 0;
   let mindist = 1e100;
   for (let i = 0; i < palette.length; i++) {
@@ -328,7 +380,12 @@ function nearestColorIndexRGBA(r, g, b, a, palette) {
   return k;
 }
 
-function nearestColorIndexRGB(r, g, b, palette) {
+function nearestColorIndexRGB(
+  r: number,
+  g: number,
+  b: number,
+  palette: Palette,
+): number {
   let k = 0;
   let mindist = 1e100;
   for (let i = 0; i < palette.length; i++) {
@@ -348,7 +405,11 @@ function nearestColorIndexRGB(r, g, b, palette) {
   return k;
 }
 
-export function snapColorsToPalette(palette, knownColors, threshold = 5) {
+export function snapColorsToPalette(
+  palette: Palette,
+  knownColors: Palette,
+  threshold = 5,
+): void {
   if (!palette.length || !knownColors.length) return;
 
   const paletteRGB = palette.map((p) => p.slice(0, 3));
@@ -379,15 +440,15 @@ export function snapColorsToPalette(palette, knownColors, threshold = 5) {
   }
 }
 
-function sqr(a) {
+function sqr(a: number): number {
   return a * a;
 }
 
 export function nearestColorIndex(
-  colors,
-  pixel,
-  distanceFn = euclideanDistanceSquared,
-) {
+  colors: Palette,
+  pixel: readonly number[],
+  distanceFn: DistanceFn = euclideanDistanceSquared,
+): number {
   let minDist = Infinity;
   let minDistIndex = -1;
   for (let j = 0; j < colors.length; j++) {
@@ -402,10 +463,10 @@ export function nearestColorIndex(
 }
 
 export function nearestColorIndexWithDistance(
-  colors,
-  pixel,
-  distanceFn = euclideanDistanceSquared,
-) {
+  colors: Palette,
+  pixel: readonly number[],
+  distanceFn: DistanceFn = euclideanDistanceSquared,
+): [number, number] {
   let minDist = Infinity;
   let minDistIndex = -1;
   for (let j = 0; j < colors.length; j++) {
@@ -420,9 +481,9 @@ export function nearestColorIndexWithDistance(
 }
 
 export function nearestColor(
-  colors,
-  pixel,
-  distanceFn = euclideanDistanceSquared,
-) {
+  colors: Palette,
+  pixel: readonly number[],
+  distanceFn: DistanceFn = euclideanDistanceSquared,
+): number[] | undefined {
   return colors[nearestColorIndex(colors, pixel, distanceFn)];
 }

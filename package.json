@@ -3,8 +3,22 @@
   "version": "1.0.3",
   "description": "very fast JS GIF encoder",
   "type": "module",
-  "main": "./src/index.js",
-  "types": "./types.d.ts",
+  "main": "./dist/gifenc.cjs",
+  "module": "./dist/gifenc.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/gifenc.mjs",
+      "require": "./dist/gifenc.cjs"
+    }
+  },
+  "files": [
+    "dist",
+    "src",
+    "README.md",
+    "LICENSE.md"
+  ],
   "license": "MIT",
   "author": {
     "name": "Matt DesLauriers",
@@ -12,14 +26,29 @@
     "url": "https://github.com/mattdesl"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "esbuild": "^0.28.0",
+    "eslint": "^10.4.1",
     "pngjs": "^7.0.0",
-    "serve": "^14.2.6"
+    "prettier": "^3.8.3",
+    "serve": "^14.2.6",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.60.1"
   },
   "scripts": {
-    "prepublishOnly": "npm run dist:cjs",
+    "prepublishOnly": "npm run build",
+    "clean": "node -e \"import('node:fs').then(({ rmSync }) => rmSync('dist', { recursive: true, force: true }))\"",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "lint": "eslint src --max-warnings=0",
+    "check": "npm run format:check && npm run lint && npm run typecheck",
+    "typecheck": "tsc --noEmit",
+    "build": "npm run clean && npm run build:esm && npm run build:cjs && npm run build:types",
+    "build:esm": "esbuild ./src/index.ts --bundle --format=esm --outfile=dist/gifenc.mjs --sourcemap --target=es2018",
+    "build:cjs": "esbuild ./src/index.ts --bundle --format=cjs --outfile=dist/gifenc.cjs --sourcemap --target=es2018",
+    "build:types": "tsc -p tsconfig.types.json",
     "serve": "serve .",
-    "dist:cjs": "esbuild ./src/index.js --bundle --format=cjs --outfile=dist/gifenc.js --sourcemap --target=es2015"
+    "dist:cjs": "npm run build:cjs"
   },
   "ava": {
     "require": [

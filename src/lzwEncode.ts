@@ -21,8 +21,8 @@
 */
 
 import createStream from "./stream.js";
+import type { ByteArray, ByteStream, Int32Buffer } from "./types.js";
 
-const EOF = -1;
 const BITS = 12;
 const DEFAULT_HSIZE = 5003; // 80% occupancy
 const MASKS = [
@@ -31,15 +31,18 @@ const MASKS = [
 ];
 
 function lzwEncode(
-  width,
-  height,
-  pixels,
-  colorDepth,
-  outStream = createStream(512),
-  accum = new Uint8Array(256),
-  htab = new Int32Array(DEFAULT_HSIZE),
-  codetab = new Int32Array(DEFAULT_HSIZE),
-) {
+  width: number,
+  height: number,
+  pixels: ByteArray,
+  colorDepth: number,
+  outStream: ByteStream = createStream(512),
+  accum: ByteArray = new Uint8Array(256),
+  htab: Int32Buffer = new Int32Array(DEFAULT_HSIZE),
+  codetab: Int32Buffer = new Int32Array(DEFAULT_HSIZE),
+): ByteArray {
+  void width;
+  void height;
+
   const hsize = htab.length;
   const initCodeSize = Math.max(2, colorDepth);
 
@@ -137,7 +140,7 @@ function lzwEncode(
   outStream.writeByte(0); // write block terminator
   return outStream.bytesView();
 
-  function output(code) {
+  function output(code: number) {
     cur_accum &= MASKS[cur_bits];
 
     if (cur_bits > 0) cur_accum |= code << cur_bits;
@@ -171,7 +174,7 @@ function lzwEncode(
       }
     }
 
-    if (code == EOFCode) {
+    if (code === EOFCode) {
       // At EOF, write the rest of the buffer.
       while (cur_bits > 0) {
         // Add a character to the end of the current packet, and if it is 254

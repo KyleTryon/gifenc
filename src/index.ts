@@ -2,6 +2,14 @@ import constants from "./constants.js";
 import lzwEncode from "./lzwEncode.js";
 import createStream from "./stream.js";
 import quantize from "./pnnquant2.js";
+import type {
+  ByteStream,
+  ByteArray,
+  GIFEncoderInstance,
+  GIFEncoderOptions,
+  Int32Buffer,
+  Palette,
+} from "./types.js";
 
 import {
   prequantize,
@@ -12,7 +20,7 @@ import {
   snapColorsToPalette,
 } from "./palettize.js";
 
-function GIFEncoder(opt = {}) {
+function GIFEncoder(opt: GIFEncoderOptions = {}): GIFEncoderInstance {
   const { initialCapacity = 4096, auto = true } = opt;
 
   // Stream all encoded data into this buffer
@@ -106,14 +114,9 @@ function GIFEncoder(opt = {}) {
         transparentIndex,
       );
 
-      const useLocalColorTable = Boolean(palette) && !first;
-      encodeImageDescriptor(
-        stream,
-        width,
-        height,
-        useLocalColorTable ? palette : null,
-      );
-      if (useLocalColorTable) encodeColorTable(stream, palette);
+      const localPalette = palette && !first ? palette : null;
+      encodeImageDescriptor(stream, width, height, localPalette);
+      if (localPalette) encodeColorTable(stream, localPalette);
       encodePixels(
         stream,
         index,
@@ -127,18 +130,18 @@ function GIFEncoder(opt = {}) {
     },
   };
 
-  function writeHeader() {
+  function writeHeader(): void {
     writeUTFBytes(stream, "GIF89a");
   }
 }
 
 function encodeGraphicControlExt(
-  stream,
-  dispose,
-  delay,
-  transparent,
-  transparentIndex,
-) {
+  stream: ByteStream,
+  dispose: number,
+  delay: number,
+  transparent: boolean,
+  transparentIndex: number,
+): void {
   stream.writeByte(0x21); // extension introducer
   stream.writeByte(0xf9); // GCE label
   stream.writeByte(4); // data block size
@@ -148,7 +151,8 @@ function encodeGraphicControlExt(
     transparent = false;
   }
 
-  var transp, disp;
+  let transp: number;
+  let disp: number;
   if (!transparent) {
     transp = 0;
     disp = 0; // dispose = no action
@@ -179,12 +183,12 @@ function encodeGraphicControlExt(
 }
 
 function encodeLogicalScreenDescriptor(
-  stream,
-  width,
-  height,
-  palette,
+  stream: ByteStream,
+  width: number,
+  height: number,
+  palette: Palette,
   colorDepth = 8,
-) {
+): void {
   const globalColorTableFlag = 1;
   const sortFlag = 0;
   const globalColorTableSize = colorTableSize(palette.length) - 1;
@@ -200,7 +204,7 @@ function encodeLogicalScreenDescriptor(
   stream.writeBytes([fields, backgroundColorIndex, pixelAspectRatio]);
 }
 
-function encodeNetscapeExt(stream, repeat) {
+function encodeNetscapeExt(stream: ByteStream, repeat: number): void {
   stream.writeByte(0x21); // extension introducer
   stream.writeByte(0xff); // app extension label
   stream.writeByte(11); // block size
@@ -211,7 +215,7 @@ function encodeNetscapeExt(stream, repeat) {
   stream.writeByte(0); // block terminator
 }
 
-function encodeColorTable(stream, palette) {
+function encodeColorTable(stream: ByteStream, palette: Palette): void {
   const colorTableLength = 1 << colorTableSize(palette.length);
   for (let i = 0; i < colorTableLength; i++) {
     let color = [0, 0, 0];
@@ -224,7 +228,12 @@ function encodeColorTable(stream, palette) {
   }
 }
 
-function encodeImageDescriptor(stream, width, height, localPalette) {
+function encodeImageDescriptor(
+  stream: ByteStream,
+  width: number,
+  height: number,
+  localPalette: Palette | null,
+): void {
   stream.writeByte(0x2c); // image separator
 
   writeUInt16(stream, 0); // x position
@@ -251,34 +260,53 @@ function encodeImageDescriptor(stream, width, height, localPalette) {
 }
 
 function encodePixels(
-  stream,
-  index,
-  width,
-  height,
-  colorDepth = 8,
-  accum,
-  htab,
-  codetab,
-) {
+  stream: ByteStream,
+  index: ByteArray,
+  width: number,
+  height: number,
+  colorDepth: number,
+  accum: ByteArray,
+  htab: Int32Buffer,
+  codetab: Int32Buffer,
+): void {
   lzwEncode(width, height, index, colorDepth, stream, accum, htab, codetab);
 }
 
 // Utilities
 
-function writeUInt16(stream, short) {
+function writeUInt16(stream: ByteStream, short: number): void {
   stream.writeByte(short & 0xff);
   stream.writeByte((short >> 8) & 0xff);
 }
 
-function writeUTFBytes(stream, text) {
-  for (var i = 0; i < text.length; i++) {
+function writeUTFBytes(stream: ByteStream, text: string): void {
+  for (let i = 0; i < text.length; i++) {
     stream.writeByte(text.charCodeAt(i));
   }
 }
 
-function colorTableSize(length) {
+function colorTableSize(length: number): number {
   return Math.max(Math.ceil(Math.log2(length)), 1);
 }
+
+export type {
+  ApplyPaletteOptions,
+  ByteArray,
+  ByteStream,
+  ClampedByteArray,
+  Color,
+  DitherAlgorithm,
+  DistanceFn,
+  Format,
+  GIFEncoderInstance,
+  GIFEncoderOptions,
+  Int32Buffer,
+  Palette,
+  PrequantizeOptions,
+  QuantizeOptions,
+  RGBAInput,
+  WriteFrameOptions,
+} from "./types.js";
 
 export {
   GIFEncoder,

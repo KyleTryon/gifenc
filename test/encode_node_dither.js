@@ -1,7 +1,7 @@
 import * as path from "path";
 import { readFile, writeFile } from "fs/promises";
 import pngjs from "pngjs";
-import { GIFEncoder, quantize, applyPalette } from "../src/index.js";
+import { GIFEncoder, quantize, applyPalette } from "../dist/gifenc.mjs";
 
 const { PNG } = pngjs;
 const __dirname = import.meta.dirname;

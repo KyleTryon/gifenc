@@ -12,17 +12,33 @@ import {
   rgba8888_to_rgba4444,
 } from "./rgb-packing.js";
 
-function clamp(value, min, max) {
+import type { Format, Palette, QuantizeOptions, RGBAInput } from "./types.js";
+
+type Bin = {
+  ac: number;
+  rc: number;
+  gc: number;
+  bc: number;
+  cnt: number;
+  nn: number;
+  fw: number;
+  bk: number;
+  tm: number;
+  mtm: number;
+  err: number;
+};
+
+function clamp(value: number, min: number, max: number): number {
   return value < min ? min : value > max ? max : value;
 }
 
-function sqr(value) {
+function sqr(value: number): number {
   return value * value;
 }
 
-function find_nn(bins, idx, hasAlpha) {
-  var nn = 0;
-  var err = 1e100;
+function find_nn(bins: Bin[], idx: number, hasAlpha: boolean): void {
+  let nn = 0;
+  let err = 1e100;
 
   const bin1 = bins[idx];
   const n1 = bin1.cnt;
@@ -30,13 +46,13 @@ function find_nn(bins, idx, hasAlpha) {
   const wr = bin1.rc;
   const wg = bin1.gc;
   const wb = bin1.bc;
-  for (var i = bin1.fw; i != 0; i = bins[i].fw) {
+  for (let i = bin1.fw; i !== 0; i = bins[i].fw) {
     const bin = bins[i];
     const n2 = bin.cnt;
     const nerr2 = (n1 * n2) / (n1 + n2);
     if (nerr2 >= err) continue;
 
-    var nerr = 0;
+    let nerr = 0;
     if (hasAlpha) {
       nerr += nerr2 * sqr(bin.ac - wa);
       if (nerr >= err) continue;
@@ -57,7 +73,7 @@ function find_nn(bins, idx, hasAlpha) {
   bin1.nn = nn;
 }
 
-function create_bin() {
+function createBin(): Bin {
   return {
     ac: 0,
     rc: 0,
@@ -73,16 +89,9 @@ function create_bin() {
   };
 }
 
-function bin_add_rgb(bin, r, g, b) {
-  bin.rc += r;
-  bin.gc += g;
-  bin.bc += b;
-  bin.cnt++;
-}
-
-function create_bin_list(data, format) {
+function createBinList(data: Uint32Array, format: Format): Bin[] {
   const bincount = format === "rgb444" ? 4096 : 65536;
-  const bins = new Array(bincount);
+  const bins: Bin[] = new Array(bincount);
   const size = data.length;
 
   /* Build histogram */
@@ -99,7 +108,7 @@ function create_bin_list(data, format) {
 
       // reduce to rgb4444 16-bit uint
       const index = rgba8888_to_rgba4444(r, g, b, a);
-      let bin = index in bins ? bins[index] : (bins[index] = create_bin());
+      const bin = bins[index] ?? (bins[index] = createBin());
       bin.rc += r;
       bin.gc += g;
       bin.bc += b;
@@ -115,7 +124,7 @@ function create_bin_list(data, format) {
 
       // reduce to rgb444 12-bit uint
       const index = rgb888_to_rgb444(r, g, b);
-      let bin = index in bins ? bins[index] : (bins[index] = create_bin());
+      const bin = bins[index] ?? (bins[index] = createBin());
       bin.rc += r;
       bin.gc += g;
       bin.bc += b;
@@ -130,7 +139,7 @@ function create_bin_list(data, format) {
 
       // reduce to rgb565 16-bit uint
       const index = rgb888_to_rgb565(r, g, b);
-      let bin = index in bins ? bins[index] : (bins[index] = create_bin());
+      const bin = bins[index] ?? (bins[index] = createBin());
       bin.rc += r;
       bin.gc += g;
       bin.bc += b;
@@ -140,7 +149,11 @@ function create_bin_list(data, format) {
   return bins;
 }
 
-export default function quantize(rgba, maxColors, opts = {}) {
+export default function quantize(
+  rgba: RGBAInput,
+  maxColors: number,
+  opts: QuantizeOptions = {},
+): Palette {
   const {
     format = "rgb565",
     clearAlpha = true,
@@ -166,17 +179,17 @@ export default function quantize(rgba, maxColors, opts = {}) {
   // rgba4444
 
   const hasAlpha = format === "rgba4444";
-  const bins = create_bin_list(data, format);
+  const bins = createBinList(data, format);
   const bincount = bins.length;
   const bincountMinusOne = bincount - 1;
   const heap = new Uint32Array(bincount + 1);
 
   /* Cluster nonempty bins at one end of array */
-  var maxbins = 0;
-  for (var i = 0; i < bincount; ++i) {
+  let maxbins = 0;
+  for (let i = 0; i < bincount; ++i) {
     const bin = bins[i];
     if (bin != null) {
-      var d = 1.0 / bin.cnt;
+      const d = 1.0 / bin.cnt;
       if (hasAlpha) bin.ac *= d;
       bin.rc *= d;
       bin.gc *= d;
@@ -189,7 +202,7 @@ export default function quantize(rgba, maxColors, opts = {}) {
     useSqrt = false;
   }
 
-  var i = 0;
+  let i = 0;
   for (; i < maxbins - 1; ++i) {
     bins[i].fw = i + 1;
     bins[i + 1].bk = i;
@@ -197,12 +210,14 @@ export default function quantize(rgba, maxColors, opts = {}) {
   }
   if (useSqrt) bins[i].cnt = Math.sqrt(bins[i].cnt);
 
-  var h, l, l2;
+  let h: number;
+  let l: number;
+  let l2: number;
   /* Initialize nearest neighbors and build heap of them */
   for (i = 0; i < maxbins; ++i) {
     find_nn(bins, i, false);
     /* Push slot on heap */
-    var err = bins[i].err;
+    const err = bins[i].err;
     for (l = ++heap[0]; l > 1; l = l2) {
       l2 = l >> 1;
       if (bins[(h = heap[l2])].err <= err) break;
@@ -212,23 +227,23 @@ export default function quantize(rgba, maxColors, opts = {}) {
   }
 
   /* Merge bins which increase error the least */
-  var extbins = maxbins - maxColors;
+  const extbins = maxbins - maxColors;
   for (i = 0; i < extbins; ) {
-    var tb;
+    let tb: Bin;
     /* Use heap to find which bins to merge */
     for (;;) {
-      var b1 = heap[1];
+      let b1 = heap[1];
       tb = bins[b1]; /* One with least error */
       /* Is stored error up to date? */
       if (tb.tm >= tb.mtm && bins[tb.nn].mtm <= tb.tm) break;
-      if (tb.mtm == bincountMinusOne)
+      if (tb.mtm === bincountMinusOne)
         /* Deleted node */ b1 = heap[1] = heap[heap[0]--];
       /* Too old error value */ else {
         find_nn(bins, b1, false);
         tb.tm = i;
       }
       /* Push slot down */
-      var err = bins[b1].err;
+      const err = bins[b1].err;
       for (l = 1; (l2 = l + l) <= heap[0]; l = l2) {
         if (l2 < heap[0] && bins[heap[l2]].err > bins[heap[l2 + 1]].err) l2++;
         if (err <= bins[(h = heap[l2])].err) break;
@@ -238,10 +253,10 @@ export default function quantize(rgba, maxColors, opts = {}) {
     }
 
     /* Do a merge */
-    var nb = bins[tb.nn];
-    var n1 = tb.cnt;
-    var n2 = nb.cnt;
-    var d = 1.0 / (n1 + n2);
+    const nb = bins[tb.nn];
+    const n1 = tb.cnt;
+    const n2 = nb.cnt;
+    const d = 1.0 / (n1 + n2);
     if (hasAlpha) tb.ac = d * (n1 * tb.ac + n2 * nb.ac);
     tb.rc = d * (n1 * tb.rc + n2 * nb.rc);
     tb.gc = d * (n1 * tb.gc + n2 * nb.gc);
@@ -256,11 +271,10 @@ export default function quantize(rgba, maxColors, opts = {}) {
   }
 
   // let palette = new Uint32Array(maxColors);
-  let palette = [];
+  const palette: Palette = [];
 
   /* Fill palette */
-  var k = 0;
-  for (i = 0; ; ++k) {
+  for (i = 0; ; ) {
     let r = clamp(Math.round(bins[i].rc), 0, 0xff);
     let g = clamp(Math.round(bins[i].gc), 0, 0xff);
     let b = clamp(Math.round(bins[i].bc), 0, 0xff);
@@ -281,18 +295,18 @@ export default function quantize(rgba, maxColors, opts = {}) {
     const color = hasAlpha ? [r, g, b, a] : [r, g, b];
     const exists = existsInPalette(palette, color);
     if (!exists) palette.push(color);
-    if ((i = bins[i].fw) == 0) break;
+    if ((i = bins[i].fw) === 0) break;
   }
 
   return palette;
 }
 
-function existsInPalette(palette, color) {
+function existsInPalette(palette: Palette, color: number[]): boolean {
   for (let i = 0; i < palette.length; i++) {
     const p = palette[i];
-    let matchesRGB =
+    const matchesRGB =
       p[0] === color[0] && p[1] === color[1] && p[2] === color[2];
-    let matchesAlpha =
+    const matchesAlpha =
       p.length >= 4 && color.length >= 4 ? p[3] === color[3] : true;
     if (matchesRGB && matchesAlpha) return true;
   }

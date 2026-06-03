@@ -233,6 +233,7 @@ npm install
 To run the node test:
 
 ```sh
+npm run build
 node test/encode_node.js
 ```
 
@@ -246,9 +247,10 @@ npm run dist:cjs
 node test/bench_node.js
 ```
 
-Benchmarking/profiling is probably easier with Chrome, and this imports the source directly rather than built version:
+Benchmarking/profiling is probably easier with Chrome:
 
 ```sh
+npm run build
 npm run serve
 ```
 
