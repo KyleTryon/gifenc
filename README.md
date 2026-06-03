@@ -241,7 +241,7 @@ And check `test/output/` folder for the result. Or to benchmark with node:
 
 ```sh
 # re-build from source
-npm run dist:cjs
+npm run build
 
 # run benchmark
 node test/bench_node.js

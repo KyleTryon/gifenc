@@ -10,8 +10,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/gifenc.mjs",
-      "require": "./dist/gifenc.cjs"
-    }
+      "require": "./dist/gifenc.cjs",
+      "default": "./dist/gifenc.mjs"
+    },
+    "./package.json": "./package.json"
   },
   "files": [
     "dist",
@@ -36,7 +38,8 @@
     "typescript-eslint": "^8.60.1"
   },
   "scripts": {
-    "prepublishOnly": "npm run build",
+    "prepare": "npm run build",
+    "prepublishOnly": "npm run check",
     "clean": "node -e \"import('node:fs').then(({ rmSync }) => rmSync('dist', { recursive: true, force: true }))\"",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
