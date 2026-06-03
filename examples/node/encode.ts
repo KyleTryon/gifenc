@@ -1,21 +1,33 @@
-import * as path from "path";
-import { readFile, writeFile } from "fs/promises";
-import pngjs from "pngjs";
-import { GIFEncoder, quantize, applyPalette } from "../dist/gifenc.mjs";
+import * as path from "node:path";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
+import * as pngjs from "pngjs";
+import {
+  GIFEncoder,
+  applyPalette,
+  quantize,
+  type Format,
+  type RGBAInput,
+} from "gifenc";
 
 const { PNG } = pngjs;
 const __dirname = import.meta.dirname;
 
 encode();
 
-async function encode() {
+type SourceImage = {
+  data: RGBAInput;
+  width: number;
+  height: number;
+};
+
+async function encode(): Promise<void> {
   // Load width/height + RGBA uint8 array data
   const { data, width, height } = await readImage(
-    path.resolve(__dirname, "fixtures/baboon.png"),
+    path.resolve(__dirname, "../../test/fixtures/baboon.png"),
   );
 
   // Choose a pixel format: rgba4444, rgb444, rgb565
-  const format = "rgb444";
+  const format: Format = "rgb444";
 
   // If necessary, quantize your colors to a reduced palette
   const palette = quantize(data, 256, { format });
@@ -36,13 +48,12 @@ async function encode() {
   const bytes = gif.bytes();
 
   // Write the uint8 array data to file
-  await writeFile(
-    path.resolve(__dirname, "output/test.gif"),
-    Buffer.from(bytes),
-  );
+  const outputFile = path.resolve(__dirname, "output/test.gif");
+  await mkdir(path.dirname(outputFile), { recursive: true });
+  await writeFile(outputFile, Buffer.from(bytes));
 }
 
-async function readImage(file) {
+async function readImage(file: string): Promise<SourceImage> {
   const { data, width, height } = PNG.sync.read(await readFile(file));
   return { data, width, height };
 }

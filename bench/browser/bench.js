@@ -1,4 +1,4 @@
-import { GIFEncoder, applyPalette, quantize } from "../dist/gifenc.mjs";
+import { GIFEncoder, applyPalette, quantize } from "../../dist/gifenc.mjs";
 
 const N = 100;
 
