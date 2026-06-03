@@ -226,16 +226,16 @@ There's some situations where you might need to change the way you approach thes
 
 Git clone this repo, then:
 
-Use Node.js 24.16.0 LTS with npm 11. The package supports Node.js 22.13.0 and newer for development tooling.
+Use Node.js 24.16.0 LTS with pnpm 11. The package supports Node.js 22.13.0 and newer for development tooling.
 
 ```sh
-npm install
+pnpm install
 ```
 
 To run the node test:
 
 ```sh
-npm run build
+pnpm run build
 node test/encode_node.js
 ```
 
@@ -243,7 +243,7 @@ And check `test/output/` folder for the result. Or to benchmark with node:
 
 ```sh
 # re-build from source
-npm run build
+pnpm run build
 
 # run benchmark
 node test/bench_node.js
@@ -252,8 +252,8 @@ node test/bench_node.js
 Benchmarking/profiling is probably easier with Chrome:
 
 ```sh
-npm run build
-npm run serve
+pnpm run build
+pnpm run serve
 ```
 
 Now navigate to [http://localhost:5000/test/bench_web.html](http://localhost:5000/test/bench_web.html).
