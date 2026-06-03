@@ -11,6 +11,7 @@ import type {
   DitherAlgorithm,
   DistanceFn,
   Format,
+  Color,
   Palette,
   PrequantizeOptions,
   RGBAInput,
@@ -45,7 +46,7 @@ function byteAt(data: RGBAInput, index: number): number {
   return value;
 }
 
-function colorAt(colors: Palette, index: number): number[] {
+function colorAt(colors: Palette, index: number): Color {
   const color = colors[index];
   if (!color) {
     throw new Error(`Expected palette color at index ${String(index)}`);
@@ -70,6 +71,16 @@ const green = (color: readonly number[]): number => colorChannel(color, 1);
 const blue = (color: readonly number[]): number => colorChannel(color, 2);
 const alpha = (color: readonly number[]): number =>
   colorChannel(color, 3, 0xff);
+
+function toRGB(color: readonly number[]): Color {
+  return [red(color), green(color), blue(color)];
+}
+
+function cloneColor(color: readonly number[]): Color {
+  return color.length >= 4
+    ? [red(color), green(color), blue(color), alpha(color)]
+    : toRGB(color);
+}
 
 function describeValue(value: unknown): string {
   if (
@@ -471,24 +482,24 @@ export function snapColorsToPalette(
 ): void {
   if (!palette.length || !knownColors.length) return;
 
-  const paletteRGB = palette.map((p) => p.slice(0, 3));
+  const paletteRGB = palette.map(toRGB);
   const thresholdSq = threshold * threshold;
   const dim = colorAt(palette, 0).length;
   for (let i = 0; i < knownColors.length; i++) {
-    let color = colorAt(knownColors, i);
+    let color: Color = colorAt(knownColors, i);
     if (color.length < dim) {
       // palette is RGBA, known is RGB
       color = [red(color), green(color), blue(color), 0xff];
     } else if (color.length > dim) {
       // palette is RGB, known is RGBA
-      color = color.slice(0, 3);
+      color = toRGB(color);
     } else {
       // make sure we always copy known colors
-      color = color.slice();
+      color = cloneColor(color);
     }
     const r = nearestColorIndexWithDistance(
       paletteRGB,
-      color.slice(0, 3),
+      toRGB(color),
       euclideanDistanceSquared,
     );
     const idx = r[0];
@@ -543,7 +554,7 @@ export function nearestColor(
   colors: Palette,
   pixel: readonly number[],
   distanceFn: DistanceFn = euclideanDistanceSquared,
-): number[] | undefined {
+): Color | undefined {
   const index = nearestColorIndex(colors, pixel, distanceFn);
   return index >= 0 ? colors[index] : undefined;
 }

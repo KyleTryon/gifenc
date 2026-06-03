@@ -12,7 +12,13 @@ import {
   rgba8888_to_rgba4444,
 } from "./rgb-packing.js";
 
-import type { Format, Palette, QuantizeOptions, RGBAInput } from "./types.js";
+import type {
+  Color,
+  Format,
+  Palette,
+  QuantizeOptions,
+  RGBAInput,
+} from "./types.js";
 
 type Bin = {
   ac: number;
@@ -347,7 +353,7 @@ export default function quantize(
       }
     }
 
-    const color = hasAlpha ? [r, g, b, a] : [r, g, b];
+    const color: Color = hasAlpha ? [r, g, b, a] : [r, g, b];
     const exists = existsInPalette(palette, color);
     if (!exists) palette.push(color);
     if ((i = bin.fw) === 0) break;
@@ -356,7 +362,7 @@ export default function quantize(
   return palette;
 }
 
-function existsInPalette(palette: Palette, color: number[]): boolean {
+function existsInPalette(palette: Palette, color: Color): boolean {
   for (let i = 0; i < palette.length; i++) {
     const p = palette[i];
     if (!p) {

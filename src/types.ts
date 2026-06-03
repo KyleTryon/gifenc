@@ -10,7 +10,11 @@ export type Int32Buffer = Int32Array;
 
 export type RGBAInput = ByteArray | ClampedByteArray;
 
-export type Color = number[];
+export type RGB = [number, number, number];
+
+export type RGBA = [number, number, number, number];
+
+export type Color = RGB | RGBA;
 
 export type Palette = Color[];
 
