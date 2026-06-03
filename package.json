@@ -46,7 +46,6 @@
     "eslint": "^10.4.1",
     "pngjs": "^7.0.0",
     "prettier": "^3.8.3",
-    "serve": "^14.2.6",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.60.1"
   },
@@ -65,7 +64,7 @@
     "build:esm": "esbuild ./src/index.ts --bundle --format=esm --outfile=dist/gifenc.mjs --sourcemap --target=es2018",
     "build:cjs": "esbuild ./src/index.ts --bundle --format=cjs --outfile=dist/gifenc.cjs --sourcemap --target=es2018",
     "build:types": "tsc -p tsconfig.types.json",
-    "serve": "serve .",
+    "serve": "node scripts/serve.mjs",
     "dist:cjs": "pnpm run build:cjs"
   },
   "keywords": [
