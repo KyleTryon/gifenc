@@ -8,7 +8,7 @@ import {
   type Format,
   type Palette,
   type RGBAInput,
-} from "gifenc";
+} from "@techsquidtv/gifenc";
 
 const { PNG } = pngjs;
 const __dirname = import.meta.dirname;

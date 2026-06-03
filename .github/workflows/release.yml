@@ -1,0 +1,142 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: Semver version increment
+        required: true
+        default: patch
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+          - prepatch
+          - preminor
+          - premajor
+          - prerelease
+      preid:
+        description: Prerelease identifier for prerelease bumps
+        required: false
+        default: beta
+        type: string
+
+permissions:
+  contents: write
+  id-token: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Publish npm package
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+          package-manager-cache: false
+
+      - name: Enable pnpm
+        run: corepack enable
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Configure release commit author
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Bump package version
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          bump="${{ inputs.bump }}"
+          preid="${{ inputs.preid }}"
+
+          if [[ "$bump" == pre* || "$bump" == "prerelease" ]]; then
+            npm version "$bump" --preid "${preid:-beta}" --no-git-tag-version
+          else
+            npm version "$bump" --no-git-tag-version
+          fi
+
+          version="$(node -p "JSON.parse(require('node:fs').readFileSync('package.json', 'utf8')).version")"
+          tag="v${version}"
+
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+          echo "tag=${tag}" >> "$GITHUB_OUTPUT"
+
+          if [[ "$version" == *-* ]]; then
+            echo "npm_tag=next" >> "$GITHUB_OUTPUT"
+            echo "prerelease=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "npm_tag=latest" >> "$GITHUB_OUTPUT"
+            echo "prerelease=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build package
+        run: pnpm run build
+
+      - name: Validate package contents
+        run: npm pack --dry-run --ignore-scripts --json
+
+      - name: Commit and tag release
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          git add package.json
+          git commit -m "chore(release): ${TAG}"
+          git tag "${TAG}"
+
+      - name: Push release commit and tag
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          git push origin HEAD:main
+          git push origin "${TAG}"
+
+      - name: Publish to npm
+        run: npm publish --access public --tag "${{ steps.version.outputs.npm_tag }}"
+
+      - name: Create GitHub release
+        uses: actions/github-script@v9
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+          PRERELEASE: ${{ steps.version.outputs.prerelease }}
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const tag = process.env.TAG;
+            const prerelease = process.env.PRERELEASE === "true";
+
+            const { data: notes } = await github.rest.repos.generateReleaseNotes({
+              owner,
+              repo,
+              tag_name: tag,
+              target_commitish: tag,
+            });
+
+            await github.rest.repos.createRelease({
+              owner,
+              repo,
+              tag_name: tag,
+              name: notes.name || tag,
+              body: notes.body,
+              prerelease,
+              generate_release_notes: false,
+            });
