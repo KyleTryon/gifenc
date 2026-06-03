@@ -30,6 +30,14 @@ const MASKS = [
   0x01ff, 0x03ff, 0x07ff, 0x0fff, 0x1fff, 0x3fff, 0x7fff, 0xffff,
 ];
 
+function tableCode(table: Int32Buffer, index: number): number {
+  const code = table[index];
+  if (code == null) {
+    throw new Error(`lzwEncode() expected table code at index ${index}`);
+  }
+  return code;
+}
+
 function lzwEncode(
   width: number,
   height: number,
@@ -42,6 +50,10 @@ function lzwEncode(
 ): ByteArray {
   void width;
   void height;
+
+  if (pixels.length === 0) {
+    throw new Error("lzwEncode() expected non-empty pixel data");
+  }
 
   const hsize = htab.length;
   const initCodeSize = Math.max(2, colorDepth);
@@ -100,20 +112,23 @@ function lzwEncode(
   for (let idx = 1; idx < length; idx++) {
     next_block: {
       const c = pixels[idx];
+      if (c == null || ent == null) {
+        throw new Error("lzwEncode() found an undefined pixel code");
+      }
       const fcode = (c << BITS) + ent;
       let i = (c << hshift) ^ ent; // xor hashing
       if (htab[i] === fcode) {
-        ent = codetab[i];
+        ent = tableCode(codetab, i);
         break next_block;
       }
 
       const disp = i === 0 ? 1 : hsize - i; // secondary hash (after G. Knott)
-      while (htab[i] >= 0) {
+      while ((htab[i] ?? -1) >= 0) {
         // non-empty slot
         i -= disp;
         if (i < 0) i += hsize;
         if (htab[i] === fcode) {
-          ent = codetab[i];
+          ent = tableCode(codetab, i);
           break next_block;
         }
       }
@@ -134,6 +149,9 @@ function lzwEncode(
   }
 
   // Put out the final code.
+  if (ent == null) {
+    throw new Error("lzwEncode() missing final pixel code");
+  }
   output(ent);
   output(EOFCode);
 
@@ -141,7 +159,7 @@ function lzwEncode(
   return outStream.bytesView();
 
   function output(code: number) {
-    cur_accum &= MASKS[cur_bits];
+    cur_accum &= MASKS[cur_bits] ?? 0xffff;
 
     if (cur_bits > 0) cur_accum |= code << cur_bits;
     else cur_accum = code;

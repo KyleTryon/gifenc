@@ -29,6 +29,48 @@ function roundStep(byte: number, step: number): number {
   return step > 1 ? Math.round(byte / step) * step : byte;
 }
 
+function uint32At(data: Uint32Array, index: number): number {
+  const value = data[index];
+  if (value == null) {
+    throw new Error(`Expected uint32 pixel at index ${index}`);
+  }
+  return value;
+}
+
+function byteAt(data: RGBAInput, index: number): number {
+  const value = data[index];
+  if (value == null) {
+    throw new Error(`Expected RGBA byte at index ${index}`);
+  }
+  return value;
+}
+
+function colorAt(colors: Palette, index: number): number[] {
+  const color = colors[index];
+  if (!color) {
+    throw new Error(`Expected palette color at index ${index}`);
+  }
+  return color;
+}
+
+function colorChannel(
+  color: readonly number[],
+  index: number,
+  fallback?: number,
+): number {
+  const value = color[index] ?? fallback;
+  if (value == null) {
+    throw new Error(`Expected color channel ${index}`);
+  }
+  return value;
+}
+
+const red = (color: readonly number[]): number => colorChannel(color, 0);
+const green = (color: readonly number[]): number => colorChannel(color, 1);
+const blue = (color: readonly number[]): number => colorChannel(color, 2);
+const alpha = (color: readonly number[]): number =>
+  colorChannel(color, 3, 0xff);
+
 export function prequantize(
   rgba: RGBAInput,
   {
@@ -39,7 +81,7 @@ export function prequantize(
 ): void {
   const data = new Uint32Array(rgba.buffer);
   for (let i = 0; i < data.length; i++) {
-    const color = data[i];
+    const color = uint32At(data, i);
     let a = (color >> 24) & 0xff;
     let b = (color >> 16) & 0xff;
     let g = (color >> 8) & 0xff;
@@ -89,7 +131,7 @@ export function applyPalette(
   // Introducing branching/conditions shows some significant impact
   if (format === "rgba4444") {
     for (let i = 0; i < length; i++) {
-      const color = data[i];
+      const color = uint32At(data, i);
       const a = (color >> 24) & 0xff;
       const b = (color >> 16) & 0xff;
       const g = (color >> 8) & 0xff;
@@ -105,7 +147,7 @@ export function applyPalette(
     const rgb888_to_key =
       format === "rgb444" ? rgb888_to_rgb444 : rgb888_to_rgb565;
     for (let i = 0; i < length; i++) {
-      const color = data[i];
+      const color = uint32At(data, i);
       const b = (color >> 16) & 0xff;
       const g = (color >> 8) & 0xff;
       const r = color & 0xff;
@@ -207,10 +249,10 @@ function applyPaletteDither(
   const index = new Uint8Array(length);
 
   for (let i = 0, j = 0; i < rgba.length; i += 4, j += channels) {
-    pixels[j] = rgba[i];
-    pixels[j + 1] = rgba[i + 1];
-    pixels[j + 2] = rgba[i + 2];
-    if (hasAlpha) pixels[j + 3] = rgba[i + 3];
+    pixels[j] = byteAt(rgba, i);
+    pixels[j + 1] = byteAt(rgba, i + 1);
+    pixels[j + 2] = byteAt(rgba, i + 2);
+    if (hasAlpha) pixels[j + 3] = byteAt(rgba, i + 3);
   }
 
   for (let y = 0; y < resolvedHeight; y++) {
@@ -222,10 +264,10 @@ function applyPaletteDither(
     for (let x = xStart; x !== xEnd; x += step) {
       const idx = y * width + x;
       const pixelOffset = idx * channels;
-      const r = clampByte(pixels[pixelOffset]);
-      const g = clampByte(pixels[pixelOffset + 1]);
-      const b = clampByte(pixels[pixelOffset + 2]);
-      const a = hasAlpha ? clampByte(pixels[pixelOffset + 3]) : 0xff;
+      const r = clampByte(pixels[pixelOffset] ?? 0);
+      const g = clampByte(pixels[pixelOffset + 1] ?? 0);
+      const b = clampByte(pixels[pixelOffset + 2] ?? 0);
+      const a = hasAlpha ? clampByte(pixels[pixelOffset + 3] ?? 0xff) : 0xff;
       const paletteIndex = hasAlpha
         ? nearestColorIndexRGBA(r, g, b, a, palette)
         : nearestColorIndexRGB(r, g, b, palette);
@@ -246,10 +288,10 @@ function applyPaletteDither(
         y,
         reverse,
         ditherStrength,
-        r - color[0],
-        g - color[1],
-        b - color[2],
-        hasAlpha ? a - color[3] : 0,
+        r - red(color),
+        g - green(color),
+        b - blue(color),
+        hasAlpha ? a - alpha(color) : 0,
       );
     }
   }
@@ -341,10 +383,10 @@ function addError(
 ): void {
   if (x < 0 || x >= width || y < 0 || y >= height) return;
   const idx = (y * width + x) * channels;
-  pixels[idx] += er * amount;
-  pixels[idx + 1] += eg * amount;
-  pixels[idx + 2] += eb * amount;
-  if (channels === 4) pixels[idx + 3] += ea * amount;
+  pixels[idx] = (pixels[idx] ?? 0) + er * amount;
+  pixels[idx + 1] = (pixels[idx + 1] ?? 0) + eg * amount;
+  pixels[idx + 2] = (pixels[idx + 2] ?? 0) + eb * amount;
+  if (channels === 4) pixels[idx + 3] = (pixels[idx + 3] ?? 0) + ea * amount;
 }
 
 function clampByte(value: number): number {
@@ -361,17 +403,17 @@ function nearestColorIndexRGBA(
   let k = 0;
   let mindist = 1e100;
   for (let i = 0; i < palette.length; i++) {
-    const px2 = palette[i];
-    const a2 = px2[3];
+    const px2 = colorAt(palette, i);
+    const a2 = alpha(px2);
     let curdist = sqr(a2 - a);
     if (curdist > mindist) continue;
-    const r2 = px2[0];
+    const r2 = red(px2);
     curdist += sqr(r2 - r);
     if (curdist > mindist) continue;
-    const g2 = px2[1];
+    const g2 = green(px2);
     curdist += sqr(g2 - g);
     if (curdist > mindist) continue;
-    const b2 = px2[2];
+    const b2 = blue(px2);
     curdist += sqr(b2 - b);
     if (curdist > mindist) continue;
     mindist = curdist;
@@ -389,14 +431,14 @@ function nearestColorIndexRGB(
   let k = 0;
   let mindist = 1e100;
   for (let i = 0; i < palette.length; i++) {
-    const px2 = palette[i];
-    const r2 = px2[0];
+    const px2 = colorAt(palette, i);
+    const r2 = red(px2);
     let curdist = sqr(r2 - r);
     if (curdist > mindist) continue;
-    const g2 = px2[1];
+    const g2 = green(px2);
     curdist += sqr(g2 - g);
     if (curdist > mindist) continue;
-    const b2 = px2[2];
+    const b2 = blue(px2);
     curdist += sqr(b2 - b);
     if (curdist > mindist) continue;
     mindist = curdist;
@@ -414,12 +456,12 @@ export function snapColorsToPalette(
 
   const paletteRGB = palette.map((p) => p.slice(0, 3));
   const thresholdSq = threshold * threshold;
-  const dim = palette[0].length;
+  const dim = colorAt(palette, 0).length;
   for (let i = 0; i < knownColors.length; i++) {
-    let color = knownColors[i];
+    let color = colorAt(knownColors, i);
     if (color.length < dim) {
       // palette is RGBA, known is RGB
-      color = [color[0], color[1], color[2], 0xff];
+      color = [red(color), green(color), blue(color), 0xff];
     } else if (color.length > dim) {
       // palette is RGB, known is RGBA
       color = color.slice(0, 3);
@@ -434,7 +476,7 @@ export function snapColorsToPalette(
     );
     const idx = r[0];
     const distanceSq = r[1];
-    if (distanceSq > 0 && distanceSq <= thresholdSq) {
+    if (idx >= 0 && distanceSq > 0 && distanceSq <= thresholdSq) {
       palette[idx] = color;
     }
   }
@@ -452,7 +494,7 @@ export function nearestColorIndex(
   let minDist = Infinity;
   let minDistIndex = -1;
   for (let j = 0; j < colors.length; j++) {
-    const paletteColor = colors[j];
+    const paletteColor = colorAt(colors, j);
     const dist = distanceFn(pixel, paletteColor);
     if (dist < minDist) {
       minDist = dist;
@@ -470,7 +512,7 @@ export function nearestColorIndexWithDistance(
   let minDist = Infinity;
   let minDistIndex = -1;
   for (let j = 0; j < colors.length; j++) {
-    const paletteColor = colors[j];
+    const paletteColor = colorAt(colors, j);
     const dist = distanceFn(pixel, paletteColor);
     if (dist < minDist) {
       minDist = dist;
@@ -485,5 +527,6 @@ export function nearestColor(
   pixel: readonly number[],
   distanceFn: DistanceFn = euclideanDistanceSquared,
 ): number[] | undefined {
-  return colors[nearestColorIndex(colors, pixel, distanceFn)];
+  const index = nearestColorIndex(colors, pixel, distanceFn);
+  return index >= 0 ? colors[index] : undefined;
 }

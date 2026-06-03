@@ -14,11 +14,19 @@ export function colorDifferenceYIQSquared(
   yiqA: readonly number[],
   yiqB: readonly number[],
 ): number {
-  const y = yiqA[0] - yiqB[0];
-  const i = yiqA[1] - yiqB[1];
-  const q = yiqA[2] - yiqB[2];
+  const y = channel(yiqA, 0) - channel(yiqB, 0);
+  const i = channel(yiqA, 1) - channel(yiqB, 1);
+  const q = channel(yiqA, 2) - channel(yiqB, 2);
   const a = alpha(yiqA) - alpha(yiqB);
   return y * y * 0.5053 + i * i * 0.299 + q * q * 0.1957 + a * a;
+}
+
+function channel(array: readonly number[], index: number): number {
+  const value = array[index];
+  if (value == null) {
+    throw new Error(`Expected color channel ${index}`);
+  }
+  return value;
 }
 
 function alpha(array: readonly number[]): number {
@@ -36,8 +44,12 @@ export function colorDifferenceRGBToYIQSquared(
   rgb1: readonly number[],
   rgb2: readonly number[],
 ): number {
-  const [r1, g1, b1] = rgb1;
-  const [r2, g2, b2] = rgb2;
+  const r1 = channel(rgb1, 0);
+  const g1 = channel(rgb1, 1);
+  const b1 = channel(rgb1, 2);
+  const r2 = channel(rgb2, 0);
+  const g2 = channel(rgb2, 1);
+  const b2 = channel(rgb2, 2);
   const y = rgb2y(r1, g1, b1) - rgb2y(r2, g2, b2),
     i = rgb2i(r1, g1, b1) - rgb2i(r2, g2, b2),
     q = rgb2q(r1, g1, b1) - rgb2q(r2, g2, b2);
@@ -58,7 +70,7 @@ export function euclideanDistanceSquared(
 ): number {
   let sum = 0;
   for (let n = 0; n < a.length; n++) {
-    const dx = a[n] - b[n];
+    const dx = channel(a, n) - channel(b, n);
     sum += dx * dx;
   }
   return sum;

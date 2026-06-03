@@ -218,13 +218,10 @@ function encodeNetscapeExt(stream: ByteStream, repeat: number): void {
 function encodeColorTable(stream: ByteStream, palette: Palette): void {
   const colorTableLength = 1 << colorTableSize(palette.length);
   for (let i = 0; i < colorTableLength; i++) {
-    let color = [0, 0, 0];
-    if (i < palette.length) {
-      color = palette[i];
-    }
-    stream.writeByte(color[0]);
-    stream.writeByte(color[1]);
-    stream.writeByte(color[2]);
+    const color = i < palette.length ? palette[i] : undefined;
+    stream.writeByte(color?.[0] ?? 0);
+    stream.writeByte(color?.[1] ?? 0);
+    stream.writeByte(color?.[2] ?? 0);
   }
 }
 

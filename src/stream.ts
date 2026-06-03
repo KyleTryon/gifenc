@@ -25,7 +25,11 @@ export default function createStream(initialCapacity = 256): ByteStream {
     writeBytes(data: ArrayLike<number>, offset = 0, byteLength = data.length) {
       expand(cursor + byteLength);
       for (let i = 0; i < byteLength; i++) {
-        contents[cursor++] = data[i + offset];
+        const byte = data[i + offset];
+        if (byte == null) {
+          throw new Error("writeBytes() source range is out of bounds");
+        }
+        contents[cursor++] = byte;
       }
     },
     writeBytesView(data: ByteArray, offset = 0, byteLength = data.byteLength) {
