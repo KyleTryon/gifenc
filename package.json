@@ -44,6 +44,7 @@
     "@types/pngjs": "^6.0.5",
     "esbuild": "^0.28.0",
     "eslint": "^10.4.1",
+    "knip": "^6.15.0",
     "pngjs": "^7.0.0",
     "prettier": "^3.8.3",
     "typescript": "^6.0.3",
@@ -56,7 +57,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint": "eslint src --max-warnings=0",
-    "check": "pnpm run format:check && pnpm run lint && pnpm run typecheck && pnpm run typecheck:api && pnpm run typecheck:examples",
+    "check": "pnpm run format:check && pnpm run lint && pnpm run typecheck && pnpm run typecheck:api && pnpm run typecheck:examples && pnpm run knip",
     "typecheck": "tsc --noEmit",
     "typecheck:api": "tsc -p tsconfig.test-types.json",
     "typecheck:examples": "tsc -p tsconfig.examples.json",
@@ -65,7 +66,8 @@
     "build:cjs": "esbuild ./src/index.ts --bundle --format=cjs --outfile=dist/gifenc.cjs --sourcemap --target=es2018",
     "build:types": "tsc -p tsconfig.types.json",
     "serve": "node scripts/serve.mjs",
-    "dist:cjs": "pnpm run build:cjs"
+    "dist:cjs": "pnpm run build:cjs",
+    "knip": "knip"
   },
   "keywords": [
     "gif",

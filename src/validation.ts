@@ -45,10 +45,7 @@ function assertByte(value: unknown, label: string): asserts value is number {
   }
 }
 
-export function assertColor(
-  color: unknown,
-  label: string,
-): asserts color is Color {
+function assertColor(color: unknown, label: string): asserts color is Color {
   if (!Array.isArray(color) || (color.length !== 3 && color.length !== 4)) {
     throw new Error(`${label} must be an RGB or RGBA color`);
   }

@@ -1,0 +1,25 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "entry": [
+    "src/palettize.ts",
+    "bench/browser/bench.js",
+    "bench/node/bench.ts",
+    "examples/browser/worker.js",
+    "examples/node/encode.ts",
+    "examples/node/encode-dither.ts",
+    "test/types/public-api.ts"
+  ],
+  "project": [
+    "src/**/*.ts",
+    "bench/**/*.js",
+    "bench/**/*.ts",
+    "examples/**/*.js",
+    "examples/**/*.ts",
+    "scripts/**/*.mjs",
+    "test/types/**/*.ts"
+  ],
+  "ignoreIssues": {
+    "src/encoder.ts": ["duplicates"]
+  },
+  "tags": ["-lintignore"]
+}
