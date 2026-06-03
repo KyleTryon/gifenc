@@ -315,6 +315,8 @@ export type {
   PrequantizeOptions,
   QuantizeOptions,
   RGBAInput,
+  RGB,
+  RGBA,
   WriteFrameOptions,
 } from "./types.js";
 
