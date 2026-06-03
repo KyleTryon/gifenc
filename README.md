@@ -297,6 +297,7 @@ Then open:
 - [http://localhost:5000/examples/browser/](http://localhost:5000/examples/browser/)
 - [http://localhost:5000/examples/browser/encode-workers.html](http://localhost:5000/examples/browser/encode-workers.html)
 - [http://localhost:5000/bench/browser/](http://localhost:5000/bench/browser/)
+- [http://localhost:5000/bench/video-report/](http://localhost:5000/bench/video-report/)
 
 ## Development
 

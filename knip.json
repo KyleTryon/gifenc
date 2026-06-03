@@ -3,6 +3,7 @@
   "entry": [
     "src/palettize.ts",
     "bench/browser/bench.js",
+    "bench/video-report/report.js",
     "bench/node/bench.ts",
     "examples/browser/worker.js",
     "examples/node/encode.ts",
