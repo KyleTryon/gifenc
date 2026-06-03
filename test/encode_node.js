@@ -1,10 +1,9 @@
 import * as path from "path";
-import { promisify } from "util";
-import { writeFile } from "fs/promises";
-import getPixelsCb from "get-pixels";
+import { readFile, writeFile } from "fs/promises";
+import pngjs from "pngjs";
 import { GIFEncoder, quantize, applyPalette } from "../src/index.js";
 
-const getPixels = promisify(getPixelsCb);
+const { PNG } = pngjs;
 const __dirname = import.meta.dirname;
 
 encode();
@@ -44,18 +43,6 @@ async function encode() {
 }
 
 async function readImage(file) {
-  const { data, shape } = await getPixels(file);
-  let width, height;
-  if (shape.length === 3) {
-    // PNG,JPG,etc...
-    width = shape[0];
-    height = shape[1];
-  } else if (shape.length === 4) {
-    // still GIFs might appear in frames, so [N,w,h]
-    width = shape[1];
-    height = shape[2];
-  } else {
-    throw new Error("Invalid shape " + shape.join(", "));
-  }
+  const { data, width, height } = PNG.sync.read(await readFile(file));
   return { data, width, height };
 }

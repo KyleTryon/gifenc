@@ -12,14 +12,14 @@
     "url": "https://github.com/mattdesl"
   },
   "devDependencies": {
-    "esbuild": "^0.8.52",
-    "get-pixels": "^3.3.2",
-    "serve": "^11.3.2"
+    "esbuild": "^0.28.0",
+    "pngjs": "^7.0.0",
+    "serve": "^14.2.6"
   },
   "scripts": {
     "prepublishOnly": "npm run dist:cjs",
     "serve": "serve .",
-    "dist:cjs": "esbuild ./src/index.js --bundle --format=cjs --outfile=dist/gifenc.js --sourcemap --target=chrome58,firefox57,safari11,edge16,node12"
+    "dist:cjs": "esbuild ./src/index.js --bundle --format=cjs --outfile=dist/gifenc.js --sourcemap --target=es2015"
   },
   "ava": {
     "require": [
