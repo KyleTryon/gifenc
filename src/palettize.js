@@ -37,10 +37,10 @@ export function prequantize(
 
 export function applyPalette(rgba, palette, options = "rgb565") {
   if (!rgba || !rgba.buffer) {
-    throw new Error("quantize() expected RGBA Uint8Array data");
+    throw new Error("applyPalette() expected RGBA Uint8Array data");
   }
   if (!(rgba instanceof Uint8Array) && !(rgba instanceof Uint8ClampedArray)) {
-    throw new Error("quantize() expected RGBA Uint8Array data");
+    throw new Error("applyPalette() expected RGBA Uint8Array data");
   }
   if (palette.length > 256) {
     throw new Error("applyPalette() only works with 256 colors or less");
@@ -101,6 +101,11 @@ function normalizeApplyPaletteOptions(options) {
   }
   if (options == null) {
     return { format: "rgb565", dither: false };
+  }
+  if (typeof options !== "object") {
+    throw new Error(
+      "applyPalette() expected options to be a format string or an options object",
+    );
   }
 
   const dither = options.dither === true ? "floyd-steinberg" : options.dither;
@@ -179,6 +184,11 @@ function applyPaletteDither(rgba, palette, opts) {
         ? nearestColorIndexRGBA(r, g, b, a, palette)
         : nearestColorIndexRGB(r, g, b, palette);
       const color = palette[paletteIndex];
+      if (!color) {
+        throw new Error(
+          "applyPalette() expected a non-empty palette when dithering",
+        );
+      }
 
       index[idx] = paletteIndex;
       diffuseError(
