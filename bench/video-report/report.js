@@ -90,12 +90,21 @@ const sourceMetrics = document.querySelector("#source-metrics");
 const sourceUrl = document.querySelector("#source-url");
 const resultsBody = document.querySelector("#results-body");
 const resultGrid = document.querySelector("#result-grid");
+const compareLeftSelect = document.querySelector("#compare-left");
+const compareRightSelect = document.querySelector("#compare-right");
+const compareLeftPane = document.querySelector("#compare-left-pane");
+const compareRightPane = document.querySelector("#compare-right-pane");
 
 let source = null;
 let sourceBlobUrl = "";
 let decodedFrames = null;
 let running = false;
 let resultUrls = [];
+let resultsById = new Map();
+const compareSelection = {
+  left: "balanced-128-spatial",
+  right: "balanced-128-spatial-temporal",
+};
 
 init().catch((error) => {
   setStatus(`Could not load source video: ${error.message}`);
@@ -119,6 +128,16 @@ resetButton.addEventListener("click", () => {
   decodedFrames = null;
   setProgress(0);
   setStatus(source ? "Ready." : "Loading source video...");
+});
+
+compareLeftSelect.addEventListener("change", () => {
+  compareSelection.left = compareLeftSelect.value;
+  renderComparison();
+});
+
+compareRightSelect.addEventListener("change", () => {
+  compareSelection.right = compareRightSelect.value;
+  renderComparison();
 });
 
 async function init() {
@@ -146,6 +165,8 @@ async function init() {
 
   renderSourceMetrics(source);
   renderSourceRow(source);
+  renderCompareOptions();
+  renderComparison();
   runButton.disabled = false;
   setStatus("Ready.");
 }
@@ -409,6 +430,7 @@ function renderSourceRow(metadata) {
 
 function renderVariantResult(metadata, variant, result) {
   const ratio = result.bytes / metadata.size;
+  resultsById.set(variant.id, result);
   const row = document.createElement("tr");
   row.innerHTML = `
     <td>${variant.name}</td>
@@ -441,6 +463,8 @@ function renderVariantResult(metadata, variant, result) {
   if (!card.isConnected) {
     resultGrid.append(card);
   }
+  renderCompareOptions();
+  renderComparison();
 }
 
 function clearResults() {
@@ -448,6 +472,7 @@ function clearResults() {
     URL.revokeObjectURL(url);
   }
   resultUrls = [];
+  resultsById = new Map();
   resultsBody.innerHTML = "";
   resultGrid.innerHTML = "";
 
@@ -464,6 +489,8 @@ function clearResults() {
     `;
     resultGrid.append(card);
   }
+  renderCompareOptions();
+  renderComparison();
 }
 
 function createMetric(label, value) {
@@ -490,6 +517,140 @@ function ditherLabel(variant) {
     return "spatial Floyd-Steinberg + temporal dithering";
   }
   return "none";
+}
+
+function renderCompareOptions() {
+  renderCompareSelect(compareLeftSelect, compareSelection.left);
+  renderCompareSelect(compareRightSelect, compareSelection.right);
+}
+
+function renderCompareSelect(select, selectedValue) {
+  const choices = getCompareChoices();
+  select.innerHTML = "";
+
+  for (const choice of choices) {
+    const option = document.createElement("option");
+    option.value = choice.id;
+    option.textContent = choice.name;
+    option.disabled = !choice.available;
+    select.append(option);
+  }
+
+  select.value = choices.some((choice) => choice.id === selectedValue)
+    ? selectedValue
+    : "source";
+}
+
+function renderComparison() {
+  renderComparePane(compareLeftPane, compareSelection.left);
+  renderComparePane(compareRightPane, compareSelection.right);
+}
+
+function renderComparePane(pane, choiceId) {
+  const choice = getCompareChoice(choiceId);
+  pane.innerHTML = "";
+
+  const title = document.createElement("h3");
+  title.textContent = choice.name;
+  pane.append(title);
+
+  const meta = document.createElement("p");
+  meta.className = "compare-meta";
+  meta.textContent = choice.meta;
+  pane.append(meta);
+
+  const mediaFrame = document.createElement("div");
+  mediaFrame.className = "media-frame";
+  pane.append(mediaFrame);
+
+  if (!choice.available) {
+    const placeholder = document.createElement("div");
+    placeholder.className = "compare-placeholder";
+    placeholder.textContent = choice.placeholder;
+    mediaFrame.append(placeholder);
+    return;
+  }
+
+  if (choice.type === "source") {
+    const video = document.createElement("video");
+    video.src = sourceBlobUrl;
+    video.controls = true;
+    video.loop = true;
+    video.muted = true;
+    video.playsInline = true;
+    mediaFrame.append(video);
+    return;
+  }
+
+  const image = document.createElement("img");
+  image.src = choice.result.url;
+  image.alt = `${choice.name} GIF comparison preview`;
+  mediaFrame.append(image);
+}
+
+function getCompareChoices() {
+  return [
+    {
+      id: "source",
+      name: "Source MP4",
+      available: Boolean(source),
+    },
+    ...variants.map((variant) => ({
+      id: variant.id,
+      name: variant.name,
+      available: resultsById.has(variant.id),
+    })),
+  ];
+}
+
+function getCompareChoice(choiceId) {
+  if (choiceId === "source") {
+    return {
+      id: "source",
+      name: "Source MP4",
+      type: "source",
+      available: Boolean(source),
+      meta: source
+        ? `${formatBytes(source.size)} / 1.00x MP4 / ${source.width} x ${source.height} / full quality video`
+        : "Loading source video",
+      placeholder: "Loading source video",
+    };
+  }
+
+  const variant = variants.find((candidate) => candidate.id === choiceId);
+  const result = resultsById.get(choiceId);
+  if (!variant) {
+    return {
+      id: "source",
+      name: "Source MP4",
+      type: "source",
+      available: Boolean(source),
+      meta: source ? "full quality video" : "Loading source video",
+      placeholder: "Loading source video",
+    };
+  }
+
+  if (!result) {
+    return {
+      id: variant.id,
+      name: variant.name,
+      type: "gif",
+      available: false,
+      meta: variantSummary(variant),
+      placeholder: "Waiting for benchmark result",
+    };
+  }
+
+  const ratio = result.bytes / source.size;
+  return {
+    id: variant.id,
+    name: variant.name,
+    type: "gif",
+    available: true,
+    result,
+    meta: `${formatBytes(result.bytes)} / ${formatNumber(ratio, 2)}x MP4 / ${result.width} x ${result.height} / ${ditherLabel(variant)}`,
+    placeholder: "Waiting for benchmark result",
+  };
 }
 
 function usesSpatialDither(variant) {
