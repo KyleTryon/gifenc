@@ -1,69 +1,91 @@
 # @techsquidtv/gifenc
 
-[![experimental](http://badges.github.io/stability-badges/dist/experimental.svg)](http://github.com/badges/stability-badges)
+A fork of [Matt DesLauriers' `gifenc`](https://github.com/mattdesl/gifenc)
+with additional features, modernized, and ported to Typescript. AI assisted.
 
-A fast and lightweight pure-JavaScript GIF encoder. Features:
+`@techsquidtv/gifenc` is a fast, lightweight JavaScript GIF encoder for Node.js,
+browsers, and workers. It keeps the original low-level approach: you control
+palette generation, palette application, and frame writing instead of handing
+everything to a black-box encoder.
 
-- Supports many standard GIF features: image, animation, transparency
-- Works in browser and Node.js (ESM + CJS)
-- Highly optimized for V8 (150 1024x1024px frames takes about 2.1 seconds with workers in Chrome)
-- Small library footprint (9KB before GZIP)
-- Can be used across multiple web workers for multi-core devices
-- Allows full control over encoding indexed bitmaps & per frame color palette
-- Fast built-in color quantizer based on a port of PnnQuant.js, which is based on "Pairwise Nearest Neighbor Clustering" [1](https://pdfs.semanticscholar.org/68b4/236e77d6026943ffa009d8b3553ace09a922.pdf) [2](https://github.com/mcychan/PnnQuant.js) [3](https://github.com/mcychan/nQuant.j2se)
-- Fast built-in palette mapping (reducing colors to their nearest paletted index), with optional Floyd-Steinberg dithering
+## Tribute
 
-This library is a little lower level than something like [GIF.js](https://jnordberg.github.io/gif.js/), but gives much better speed (i.e. often more than twice as fast) with similar visual results for many types of images. Because of the current choice of color quantizer, this encoder is best suited for simple flat-style vector graphics, though optional Floyd-Steinberg dithering can help reduce banding in gradients, photographs, and other continuous-tone images. Some video-like animation may still need special handling across frames (e.g. temporal dithering) or better perceptual color quantizers.
+This project exists because of Matt DesLauriers' original `gifenc`, a tiny and
+clever pure-JavaScript GIF encoder. The core API shape, stream encoder, and
+performance-minded design come from that work.
 
-Some features that could be explored in a future version:
+This fork keeps that lineage visible while adding newer package tooling and
+features under the `@techsquidtv/gifenc` npm scope.
 
-- Alternative color quantizers
-- Alternative palette mapping (such as perceptually based)
-- Temporal dithering support
-- WASM-based speed optimizations
-- Optimizations for FireFox
-- Support Interlacing
+## What's Different
 
-## Example
+- Published as `@techsquidtv/gifenc`.
+- TypeScript source with generated declaration files.
+- Modern package exports for ESM and CommonJS consumers.
+- Floyd-Steinberg dithering support in `applyPalette`.
+- Updated examples, benchmarks, development tooling, and release automation.
 
-You can see a simple browser example [here](https://codepen.io/mattdesl/full/vYypMXv).
+## Install
 
-You can see a more advanced example of this encoder in action inside [looom-tools.netlify.app](https://looom-tools.netlify.app/).
+```sh
+npm install @techsquidtv/gifenc
+```
 
-Also see [./examples/node/encode.ts](./examples/node/encode.ts) for a pure Node.js example, or [./examples/node/encode-dither.ts](./examples/node/encode-dither.ts) for a Node example that writes both plain and dithered GIFs from the same source image.
+```js
+import { GIFEncoder, quantize, applyPalette } from "@techsquidtv/gifenc";
+```
 
-Basic code example:
+For direct browser imports, use the ESM build:
 
 ```js
 import {
   GIFEncoder,
   quantize,
   applyPalette,
-} from "https://unpkg.com/@techsquidtv/gifenc";
-
-// Get your RGBA image into Uint8Array data, such as from canvas
-const { data, width, height } = /* ... getImageData() ... */;
-
-// Quantize your colors to a 256-color RGB palette palette
-const palette = quantize(data, 256);
-
-// Get an indexed bitmap by reducing each pixel to the nearest color palette
-const index = applyPalette(data, palette);
-
-// Create an encoding stream
-const gif = GIFEncoder();
-
-// Write a single frame
-gif.writeFrame(index, width, height, { palette });
-
-// Write end-of-stream character
-gif.finish();
-
-// Get the Uint8Array output of your binary GIF file
-const output = gif.bytes();
+} from "https://unpkg.com/@techsquidtv/gifenc/dist/gifenc.mjs";
 ```
 
-To reduce banding in continuous-tone images, enable Floyd-Steinberg dithering when applying the palette. Dithering needs the image width so it can avoid diffusing color error across row boundaries.
+## Quick Start
+
+```js
+import { GIFEncoder, quantize, applyPalette } from "@techsquidtv/gifenc";
+
+const { data, width, height } = getImageDataSomehow();
+
+const palette = quantize(data, 256);
+const index = applyPalette(data, palette);
+
+const gif = GIFEncoder();
+gif.writeFrame(index, width, height, { palette });
+gif.finish();
+
+const bytes = gif.bytes();
+```
+
+For an animation, call `writeFrame` for each frame before `finish`:
+
+```js
+const gif = GIFEncoder();
+
+for (const frame of frames) {
+  const palette = quantize(frame.data, 256);
+  const index = applyPalette(frame.data, palette);
+
+  gif.writeFrame(index, frame.width, frame.height, {
+    palette,
+    delay: 100,
+  });
+}
+
+gif.finish();
+const bytes = gif.bytes();
+```
+
+## Dithering
+
+Use Floyd-Steinberg dithering when mapping RGBA pixels to a reduced palette. This
+can help gradients, photographs, and other continuous-tone images avoid obvious
+banding.
 
 ```js
 const format = "rgb565";
@@ -76,206 +98,174 @@ const index = applyPalette(data, palette, {
 });
 ```
 
-## API
-
-> :bulb: If you are new to GIF encoding, you might want to read [How GIF Encoding Works](#how-gif-encoding-works) to better understand the steps involved.
-
-### `palette = quantize(rgba, maxColors, options = {})`
-
-Given the image contained by `rgba`, a flat `Uint8Array` or `Uint8ClampedArray` of per-pixel RGBA data, this method will quantize the total number of colors down to a reduced palette no greater than `maxColors`.
-
-Options:
-
-- `format` (string, default `"rgb565"`) — this is the color format, either `"rgb565"` (default), `"rgb444"`, or `"rgba4444"`
-  - 565 means 5 bits red, 6 bits green, 5 bits blue (better quality, slower)
-  - `rgb444` is 4 bits per channel (lower quality, faster)
-  - `rgba4444` is the same as above but with alpha support
-  - if you choose `rgba4444`, the resulting color table will include alpha channel
-- `oneBitAlpha` (boolean|number, default false) — if alpha format is selected, this will go through all quantized RGBA colors and set their alpha to either `0x00` if the alpha is less than or equal to `127`, otherwise it will be set to `0xFF`. You can specify a number here instead of a boolean to use a specific 1-bit alpha threshold
-- `clearAlpha` (boolean, default true) — if alpha format is selected and the quantized color is below `clearAlphaThreshold`, it will be replaced with `clearAlphaColor` (i.e. RGB colors with 0 opacity will be replaced with pure black)
-- `clearAlphaThreshold` (number, default 0) — if alpha and `clearAlpha` is enabled, and a quantized pixel has an alpha below or equal to this value, its RGB values will be set to `clearAlphaColor`
-- `clearAlphaColor` (number, default `0x00`) — if alpha and `clearAlpha` is enabled and a quantized pixel is being cleared, this is the color its RGB cahnnels will be cleared to (typically you will choose `0x00` or `0xff`)
-
-The return value `palette` is an array of arrays, and no greater than `maxColors` in length. Each array in the `palette` is either RGB or RGBA (depending on pixel format) such as `[ r, g, b ]` or `[ r, g, b, a ]` in bytes.
-
-### `index = applyPalette(rgba, palette, options = "rgb565")`
-
-This will determine the color index for each pixel in the `rgba` image. The pixel input is the same as the above function: to a flat `Uint8Array` or `Uint8ClampedArray` of per-pixel RGBA data.
-
-The method will step through each pixel and determine it's closest pixel in the color table (in euclidean RGB(A) space), and replace the pixel with an index value in the range 0..255. The return value `index` is a `Uint8Array` with a length equal to `rgba.length / 4` (i.e. 1 byte per pixel).
-
-The method uses `palette`, which is an array of arrays such as received from the `quantize` method, and may be in RGB or RGBA depending on your desired `format`.
-
-```js
-const palette = [
-  [0, 255, 10],
-  [50, 20, 100],
-  // ...
-];
-```
-
-For backwards compatibility, `options` can be the `format` string. You can also pass an options object:
-
-- `format` (string, default `"rgb565"`) — this is the same as in `quantize`, and you can choose between opaque (RGB) and semi-transparent (RGBA) formats. You'll likely want to choose the same format you used to quantize your image.
-- `dither` (boolean|string, default `false`) — enables dithering. If set to `true`, this uses `"floyd-steinberg"` dithering. Currently, `"floyd-steinberg"` is the only supported algorithm.
-- `width` (number) — required when `dither` is enabled, so the dithering pass can detect row boundaries.
-- `height` (number, optional) — when specified, `width * height` must match the number of pixels in `rgba`. If omitted, it is inferred from `rgba.length / 4 / width`.
-- `ditherStrength` (number, default `1`) — scales how much quantization error is diffused into neighboring pixels.
-- `serpentine` (boolean, default `true`) — alternates scan direction on every row to reduce directional artifacts.
+You can also tune the dither pass:
 
 ```js
 const index = applyPalette(data, palette, {
-  format: "rgb565",
   dither: "floyd-steinberg",
   width,
   height,
+  ditherStrength: 0.75,
+  serpentine: true,
 });
 ```
 
-### `gif = GIFEncoder(opts = {})`
+## API
 
-Creates a new GIF stream with the given options (for basic usage, you can ignore these).
+### `quantize(rgba, maxColors, options)`
 
-- `auto` (boolean, default true) — in "auto" mode, the header and first-frame metadata (global palette) will be written upon writing the first frame. If set to false, you will be responsible for first writing a GIF header, then writing frames with `{ first }` boolean specified.
-- `initialCapacity` (number, default 4096) — the number of bytes to initially set the internal buffer to, it will grow as bytes are written to the stream
+Builds a reduced color palette from RGBA pixel data.
 
-Once created:
+- `rgba`: `Uint8Array` or `Uint8ClampedArray` containing RGBA pixels.
+- `maxColors`: maximum palette size, usually `256` or less.
+- `options.format`: `"rgb565"`, `"rgb444"`, or `"rgba4444"`.
+- `options.oneBitAlpha`: converts alpha to fully transparent or fully opaque.
+- `options.clearAlpha`: clears RGB channels for transparent colors.
 
-#### `gif.writeFrame(index, width, height, opts = {})`
-
-Writes a single frame into the GIF stream, with `index` (indexed Uint8Array bitmap image), a size, and optional per-frame options:
-
-- `palette` (color table array) — the color table for this frame, which is required for the first frame (i.e. global color table) but optional for subsequent frames. If not specified, the frame will use the first (global) color table in the stream.
-- `first` (boolean, default false) — in non-auto mode, set this to true when encoding the first frame in an image or sequence, and it will encode the Logical Screen Descriptor and a Global Color Table. This option is ignored in `auto` mode.
-- `transparent` (boolean, default false) — enable 1-bit transparency for this frame
-- `transparentIndex` (number, default 0) — if `transparency` is enabled, the color at the specified palette index will be treated as fully transparent for this frame
-- `delay` (number, default 0) — the frame delay in milliseconds
-- `repeat` (number, default 0) — repeat count, set to `-1` for 'once', `0` for 'forever', and any other positive integer for the number of repetitions
-- `dispose` (number, default -1) — advanced GIF dispose flag override, -1 is 'use default'
-
-#### `gif.finish()`
-
-Writes the GIF end-of-stream character, required after writing all frames for the image to encode correctly.
-
-#### `gif.bytes()`
-
-Gets a slice of the Uint8Array bytes that is underlying this GIF stream. (Note: this incurs a copy)
-
-#### `gif.bytesView()`
-
-Gets a direct typed array buffer view into the Uint8Array bytes underlying this GIF stream. (Note: no copy involved, but best to use this carefully).
-
-#### `gif.writeHeader()`
-
-Writes a GIF header into the stream, only necessary if you have specified `{ auto: false }` in the GIFEncoder options.
-
-#### `gif.reset()`
-
-Resets this GIF stream by simply setting its internal stream cursor (index) to zero, so that subsequent writes will replace the previous data in the underlying buffer.
-
-#### `gif.buffer`
-
-A property on the GIF stream that returns the currently backed `ArrayBuffer`, note this reference may change as the buffer grows in size.
-
-#### `gif.stream`
-
-A property on the GIF stream that returns an internal API that holds an expandable buffer and allows writing single or multiple bytes.
+Returns a palette such as:
 
 ```js
-// write a single byte to stream
-gif.stream.writeByte(0xff);
-// write a chunk of bytes to the stream
-gif.stream.writeBytes(myTypedArray, offset, byteLength);
+[
+  [0, 255, 10],
+  [50, 20, 100],
+];
 ```
 
-### `index = nearestColorIndex(palette, pixel)`
+### `applyPalette(rgba, palette, options)`
 
-For the given `pixel` as `[r,g,b]` or `[r,g,b,a]` (depending on your pixel format), determines the index (0...N) of the nearest color in your `palette` array of colors in the same RGB(A) format.
+Maps RGBA pixels to palette indexes.
 
-### `[index, distance] = nearestColorIndexWithDistance(palette, pixel)`
+- `rgba`: source RGBA pixel data.
+- `palette`: palette returned by `quantize` or supplied by your app.
+- `options`: either a format string or an options object.
+- `options.dither`: `false`, `true`, or `"floyd-steinberg"`.
+- `options.width`: required when dithering is enabled.
+- `options.height`: optional consistency check for dithered input.
+- `options.ditherStrength`: scales propagated quantization error.
+- `options.serpentine`: alternates scan direction per row.
 
-Same as above, but returns a tuple of `index` and `distance` (euclidean distance squared).
+Returns a `Uint8Array` with one palette index per pixel.
+
+### `GIFEncoder(options)`
+
+Creates an encoder stream.
+
+- `options.auto`: when `true`, writes the GIF header and first-frame metadata on
+  the first frame.
+- `options.initialCapacity`: starting internal buffer size.
+
+Common methods:
+
+- `writeFrame(index, width, height, options)`: writes one indexed frame.
+- `finish()`: writes the GIF trailer.
+- `bytes()`: returns a copied `Uint8Array`.
+- `bytesView()`: returns a direct view into the encoder buffer.
+- `writeHeader()`: writes a header manually when `auto` is disabled.
+- `reset()`: reuses the encoder buffer for another GIF.
+
+Frame options include:
+
+- `palette`: color table for the frame.
+- `delay`: frame delay in milliseconds.
+- `repeat`: animation repeat count, where `0` means forever.
+- `transparent`: enables one-bit transparency.
+- `transparentIndex`: palette index to treat as transparent.
+- `dispose`: GIF disposal method override.
+
+### Color Helpers
+
+- `nearestColorIndex(palette, pixel)`: returns the closest palette index.
+- `nearestColorIndexWithDistance(palette, pixel)`: returns
+  `[index, distance]`.
+- `prequantize(rgba, options)`: reduces RGBA precision before quantization.
 
 ## Web Workers
 
-For the best speed, you should use workers to split this work across multiple threads. Compare these encoding speeds with 150 frames of 1024x1024px GIF in Chrome:
+`gifenc` works well in workers because quantization, palette mapping, and frame
+encoding can be split across frames.
 
-- Main thread only: ~5 seconds
-- Split across 4 workers: ~2 seconds
+A common pattern:
 
-This library will run fine in a worker with ES support, but there is currently no built-in worker API, and it's up to the developer to implement their own worker architecture and handle bundling.
+- Send RGBA frame data to workers.
+- In each worker, call `quantize`, `applyPalette`, and `GIFEncoder`.
+- Return encoded frame chunks to the main thread.
+- Combine chunks into one final GIF stream.
 
-The simplest architecture, and the one used in my [Looom exporter](https://github.com/mattdesl/looom-tools/blob/dd04eb2985a8defec3dc9874600ca033bda5d96f/site/components/record.js#L250), is to:
+See the local worker example:
 
-- Send the RGBA pixel data of each frame to one worker amongst a pool of multiple workers
-- In the worker, do quantization, apply palette, and then use `GIFEncoder({ auto: false })` to write a 'chunk' of GIF without a header or end-of-stream
-- Send the encoded bytes view back to the main thread, which will store the chunk into a linear array
-- Once all streams have been encoded and their workers responded with encoded chunks, you can write all frames sequentially into a single GIF stream
-
-There is an example of this in [./examples/browser/encode-workers.html](./examples/browser/encode-workers.html) which uses [./examples/browser/worker.js](./examples/browser/worker.js). Future versions of this library might include a pre-bundled worker API built-in for easier use.
+- [`examples/browser/encode-workers.html`](./examples/browser/encode-workers.html)
+- [`examples/browser/worker.js`](./examples/browser/worker.js)
 
 ## How GIF Encoding Works
 
-There are generally 3 steps involved, but some applications might be able to skip these or choose a different algorithm for one of the steps, so this library gives you control over each step.
+GIF encoding usually has three steps:
 
-For each frame in your animation (or, just a single frame for still images):
+1. Quantize RGBA pixels into a palette of 256 colors or fewer.
+2. Map each RGBA pixel to the nearest palette index.
+3. Write indexed frames and palettes into a GIF stream.
 
-1. You'll first need to convert RGB(A) pixels from your source graphic/photograph into a reduced color table (palette) of 256 or less RGB colors. The act of reducing thousands of colors into 256 unique colors that still produce good quality results is known as _quantization_.
-2. Then, you'll need to turn your RGB(A) pixels into an _indexed bitmap_, basically going through each pixel and finding the nearest _index_ into the color table for that pixel, based on our reduced palette. In `gifenc`, we call this _applying a palette_. The result of this is a bitmap image where each pixel is an index integer in the range 0..255 that points to a color in your palette.
-3. Now, we can _encode_ this single frame by writing the indexed bitmap and local palette. This will compress the pixel data with GIF/LZW encoding, and add it to the GIF stream.
+This package exposes all three steps so you can make tradeoffs per project: use
+one palette for an entire animation, quantize each frame independently, enable
+dithering for gradients, or skip quantization entirely if your input is already
+indexed.
 
-There's some situations where you might need to change the way you approach these steps. For example, if you decide to use a single global 256-color palette for a whole animation, you might only need to _quantize_ once, and then _applyPalette_ to each frame by reducing to the same global palette. In some other cases, you might choose to add _prequantization_ or _postquantization_ to speed up and improve the quantization results, or perhaps skip steps #2 and #3 if you already have indexed images. Or, you might choose to use dithering, or perhaps another quantizer entirely.
+## Examples
 
-## Running from Source
-
-Git clone this repo, then:
-
-Use Node.js 24.16.0 LTS with pnpm 11. The package supports Node.js 22.13.0 and newer for development tooling.
-
-```sh
-pnpm install
-```
-
-To run the node test:
+Node examples:
 
 ```sh
 pnpm run build
 node examples/node/encode.ts
+node examples/node/encode-dither.ts
 ```
 
-And check `examples/node/output/` folder for the result. Or to benchmark with node:
-
-```sh
-# re-build from source
-pnpm run build
-
-# run benchmark
-node bench/node/bench.ts
-```
-
-Benchmarking/profiling is probably easier with Chrome:
+Browser examples:
 
 ```sh
 pnpm run build
 pnpm run serve
 ```
 
-Now navigate to [http://localhost:5000/bench/browser/](http://localhost:5000/bench/browser/).
+Then open:
 
-Similarly, while serving you can
+- [http://localhost:5000/examples/browser/](http://localhost:5000/examples/browser/)
+- [http://localhost:5000/examples/browser/encode-workers.html](http://localhost:5000/examples/browser/encode-workers.html)
+- [http://localhost:5000/bench/browser/](http://localhost:5000/bench/browser/)
 
-## More to Come
+## Development
 
-This library is still a WIP, feel free to open an issue to discuss some things.
+Use Node.js 24.16.0 LTS with pnpm 11 for local development. The tooling supports
+Node.js 22.13.0 and newer.
+
+```sh
+pnpm install
+pnpm run build
+pnpm run check
+```
+
+Useful scripts:
+
+- `pnpm run build`: builds ESM, CommonJS, and types into `dist`.
+- `pnpm run check`: runs formatting, linting, type checks, and dependency checks.
+- `pnpm run serve`: starts the local example server.
+
+## Publishing
+
+This fork publishes publicly to npm as `@techsquidtv/gifenc`. Releases are
+intended to be created through the GitHub release workflow so version bumps,
+tags, generated release notes, and npm publishing stay together.
 
 ## Credits
 
-The code here has been forked/inspired/remixed from these libraries:
+Created from [Matt DesLauriers' `gifenc`](https://github.com/mattdesl/gifenc).
+Thank you to Matt for the original encoder and API design.
 
-- [Gif.js](https://jnordberg.github.io/gif.js/)
+This project also builds on ideas and prior art from:
+
+- [GIF.js](https://jnordberg.github.io/gif.js/)
 - [gif-codec](https://github.com/potomak/gif-codec)
 - [PnnQuant.js](https://github.com/mcychan/PnnQuant.js)
 
 ## License
 
-MIT, see [LICENSE.md](https://github.com/KyleTryon/gifenc/blob/main/LICENSE.md) for details.
+MIT. See [LICENSE.md](./LICENSE.md).
