@@ -17,17 +17,17 @@ const variants = [
     colors: 256,
     format: "rgb565",
     paletteStrategy: "frame",
-    dither: false,
+    ditherMode: "none",
   },
   {
-    id: "full-256-dithered",
-    name: "Full 256 dithered",
+    id: "full-256-spatial-temporal",
+    name: "Full 256 spatial + temporal",
     scale: 1,
     fps: 24,
     colors: 256,
     format: "rgb565",
     paletteStrategy: "frame",
-    dither: true,
+    ditherMode: "spatial-temporal",
   },
   {
     id: "balanced-128",
@@ -37,17 +37,27 @@ const variants = [
     colors: 128,
     format: "rgb565",
     paletteStrategy: "frame",
-    dither: false,
+    ditherMode: "none",
   },
   {
-    id: "balanced-128-dithered",
-    name: "Balanced 128 dithered",
+    id: "balanced-128-spatial",
+    name: "Balanced 128 spatial",
     scale: 1,
     fps: 12,
     colors: 128,
     format: "rgb565",
     paletteStrategy: "frame",
-    dither: true,
+    ditherMode: "spatial",
+  },
+  {
+    id: "balanced-128-spatial-temporal",
+    name: "Balanced 128 spatial + temporal",
+    scale: 1,
+    fps: 12,
+    colors: 128,
+    format: "rgb565",
+    paletteStrategy: "frame",
+    ditherMode: "spatial-temporal",
   },
   {
     id: "shared-palette-128",
@@ -57,7 +67,7 @@ const variants = [
     colors: 128,
     format: "rgb565",
     paletteStrategy: "shared",
-    dither: false,
+    ditherMode: "none",
   },
   {
     id: "compact-64",
@@ -67,7 +77,7 @@ const variants = [
     colors: 64,
     format: "rgb444",
     paletteStrategy: "frame",
-    dither: false,
+    ditherMode: "none",
   },
 ];
 
@@ -243,13 +253,14 @@ async function encodeVariant(metadata, frames, variant, onProgress) {
 
   onProgress(0.25);
 
-  const temporalDither = variant.dither
-    ? createTemporalDither({
-        width,
-        height,
-        format: variant.format,
-      })
-    : null;
+  const temporalDither =
+    variant.ditherMode === "spatial-temporal"
+      ? createTemporalDither({
+          width,
+          height,
+          format: variant.format,
+        })
+      : null;
   const encoder = GIFEncoder();
   const delay = 1000 / variant.fps;
 
@@ -263,7 +274,7 @@ async function encodeVariant(metadata, frames, variant, onProgress) {
     const index = applyPalette(
       rgba,
       palette,
-      variant.dither
+      usesSpatialDither(variant)
         ? {
             format: variant.format,
             dither: "floyd-steinberg",
@@ -421,7 +432,7 @@ function renderVariantResult(metadata, variant, result) {
   card.innerHTML = `
     <h3>${variant.name}</h3>
     <p class="result-meta">
-      ${formatBytes(result.bytes)} / ${formatNumber(ratio, 2)}x MP4 / ${result.width} x ${result.height}
+      ${formatBytes(result.bytes)} / ${formatNumber(ratio, 2)}x MP4 / ${result.width} x ${result.height} / ${ditherLabel(variant)}
     </p>
     <div class="media-frame">
       <img src="${result.url}" alt="${variant.name} GIF preview" />
@@ -464,7 +475,7 @@ function createMetric(label, value) {
 
 function variantSummary(variant) {
   const dimensions = variant.scale === 1 ? "full size" : "half scale";
-  return `${dimensions}, ${variant.fps} fps, ${variant.colors} colors, ${variant.format}`;
+  return `${dimensions}, ${variant.fps} fps, ${variant.colors} colors, ${variant.format}, ${ditherLabel(variant)}`;
 }
 
 function paletteLabel(variant) {
@@ -472,7 +483,20 @@ function paletteLabel(variant) {
 }
 
 function ditherLabel(variant) {
-  return variant.dither ? "Floyd-Steinberg + temporal" : "none";
+  if (variant.ditherMode === "spatial") {
+    return "spatial Floyd-Steinberg";
+  }
+  if (variant.ditherMode === "spatial-temporal") {
+    return "spatial Floyd-Steinberg + temporal dithering";
+  }
+  return "none";
+}
+
+function usesSpatialDither(variant) {
+  return (
+    variant.ditherMode === "spatial" ||
+    variant.ditherMode === "spatial-temporal"
+  );
 }
 
 function formatBytes(bytes) {

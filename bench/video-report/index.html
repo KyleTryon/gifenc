@@ -234,6 +234,42 @@
         font-weight: 750;
       }
 
+      .mode-panel {
+        margin-top: 24px;
+        padding: 18px;
+      }
+
+      .mode-panel h2 {
+        font-size: 1.05rem;
+      }
+
+      .mode-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 1px;
+        margin-top: 14px;
+        overflow: hidden;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: var(--border);
+      }
+
+      .mode {
+        min-width: 0;
+        padding: 14px;
+        background: var(--surface);
+      }
+
+      .mode h3 {
+        font-size: 0.92rem;
+      }
+
+      .mode p {
+        margin-top: 6px;
+        color: var(--muted);
+        font-size: 0.9rem;
+      }
+
       .table-wrap {
         margin-top: 24px;
         overflow-x: auto;
@@ -343,6 +379,10 @@
           grid-template-columns: 1fr;
         }
 
+        .mode-grid {
+          grid-template-columns: 1fr;
+        }
+
         .panel-header {
           display: block;
         }
@@ -396,6 +436,29 @@
           </div>
           <dl class="metric-grid" id="source-metrics"></dl>
         </article>
+      </section>
+
+      <section class="panel mode-panel" aria-label="Dither modes">
+        <h2>Dither Modes</h2>
+        <div class="mode-grid">
+          <article class="mode">
+            <h3>None</h3>
+            <p>
+              Nearest palette lookup without spatial or temporal error carry.
+            </p>
+          </article>
+          <article class="mode">
+            <h3>Spatial Floyd-Steinberg</h3>
+            <p>Error diffusion inside each frame during palette application.</p>
+          </article>
+          <article class="mode">
+            <h3>Spatial + Temporal</h3>
+            <p>
+              Floyd-Steinberg plus temporal dithering state shared across the
+              animation.
+            </p>
+          </article>
+        </div>
       </section>
 
       <section class="table-wrap" aria-label="Benchmark file sizes">
