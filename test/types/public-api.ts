@@ -1,6 +1,7 @@
 import {
   GIFEncoder,
   applyPalette,
+  createTemporalDither,
   nearestColorIndex,
   nearestColorIndexWithDistance,
   quantize,
@@ -9,6 +10,8 @@ import {
   type Palette,
   type RGB,
   type RGBA,
+  type TemporalDitherOptions,
+  type TemporalDitherState,
 } from "../../src/index.js";
 
 const rgbaData = new Uint8Array([0, 0, 0, 255]);
@@ -29,8 +32,19 @@ const paletteOptions: ApplyPaletteOptions = {
   width: 1,
   height: 1,
 };
+const temporalOptions: TemporalDitherOptions = {
+  width: 1,
+  height: 1,
+  decay: 0.8,
+};
+const temporalDither: TemporalDitherState =
+  createTemporalDither(temporalOptions);
 
 applyPalette(rgbaData, quantized, paletteOptions);
+applyPalette(rgbaData, palette, {
+  temporalDither,
+});
+temporalDither.reset();
 GIFEncoder().writeFrame(indexed, 1, 1, { palette: [rgb] });
 
 const nearestIndex: number = nearestColorIndex(palette, rgb);
@@ -55,6 +69,11 @@ applyPalette(rgbaData, palette, {
   // @ts-expect-error dither only accepts true, false, or floyd-steinberg
   dither: "jarvis-judice-ninke",
   width: 1,
+});
+
+applyPalette(rgbaData, palette, {
+  // @ts-expect-error temporalDither expects state from createTemporalDither
+  temporalDither: true,
 });
 
 void invalidColor;

@@ -133,6 +133,76 @@ export type PrequantizeOptions = {
 };
 
 /**
+ * Options for {@link createTemporalDither}.
+ */
+export type TemporalDitherOptions = {
+  /**
+   * Frame width in pixels.
+   */
+  width: number;
+  /**
+   * Frame height in pixels.
+   */
+  height: number;
+  /**
+   * Palette lookup format. Defaults to `"rgb565"`.
+   */
+  format?: Format;
+  /**
+   * Multiplier for the previous frame's carried quantization error.
+   *
+   * Defaults to `1`.
+   */
+  strength?: number;
+  /**
+   * Amount of newly computed quantization error to carry into the next frame.
+   *
+   * Defaults to `0.75`.
+   */
+  decay?: number;
+  /**
+   * Maximum absolute carried error per channel.
+   *
+   * Defaults to `128`.
+   */
+  maxError?: number;
+};
+
+/**
+ * Resettable per-animation state used for temporal dithering.
+ */
+export type TemporalDitherState = {
+  /**
+   * Frame width in pixels.
+   */
+  readonly width: number;
+  /**
+   * Frame height in pixels.
+   */
+  readonly height: number;
+  /**
+   * Palette lookup format used to size the carried error buffer.
+   */
+  readonly format: Format;
+  /**
+   * Multiplier for the previous frame's carried quantization error.
+   */
+  readonly strength: number;
+  /**
+   * Amount of newly computed quantization error to carry into the next frame.
+   */
+  readonly decay: number;
+  /**
+   * Maximum absolute carried error per channel.
+   */
+  readonly maxError: number;
+  /**
+   * Clear all carried error before starting a new animation sequence.
+   */
+  reset(): void;
+};
+
+/**
  * Options for {@link applyPalette}.
  */
 export type ApplyPaletteOptions = {
@@ -166,6 +236,13 @@ export type ApplyPaletteOptions = {
    * Defaults to `false`.
    */
   serpentine?: boolean;
+  /**
+   * Carry quantization error across frames.
+   *
+   * Create this once per animation with {@link createTemporalDither}, then pass
+   * the same state while mapping each frame.
+   */
+  temporalDither?: TemporalDitherState | false | null;
 };
 
 /**

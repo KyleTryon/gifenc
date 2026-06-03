@@ -1,5 +1,6 @@
 import { assertRgbaByteLength } from "../rgba.js";
 import { nearestColorIndexRGB, nearestColorIndexRGBA } from "./nearest.js";
+import { getTemporalDitherBuffer, temporalDitherChannels } from "./temporal.js";
 import { alpha, blue, byteAt, green, red } from "./utils.js";
 import type { Palette, RGBAInput } from "../types.js";
 import type { NormalizedApplyPaletteOptions } from "./options.js";
@@ -9,21 +10,28 @@ export function applyPaletteDither(
   palette: Palette,
   opts: NormalizedApplyPaletteOptions,
 ): Uint8Array {
-  const { format, width, height, ditherStrength, serpentine } = opts;
+  const { format, width, height, ditherStrength, serpentine, temporalDither } =
+    opts;
   assertRgbaByteLength(rgba, "applyPalette");
   const length = rgba.length / 4;
   if (length !== Math.floor(length)) {
     throw new Error("applyPalette() expected RGBA data length to divide by 4");
   }
-  if (!width || width < 1 || width !== Math.floor(width)) {
+  const resolvedWidth = width ?? temporalDither?.width;
+  if (
+    !resolvedWidth ||
+    resolvedWidth < 1 ||
+    resolvedWidth !== Math.floor(resolvedWidth)
+  ) {
     throw new Error("applyPalette() requires { width } when dithering");
   }
 
-  const resolvedHeight = height == null ? length / width : height;
+  const resolvedHeight =
+    height ?? temporalDither?.height ?? length / resolvedWidth;
   if (
     resolvedHeight < 1 ||
     resolvedHeight !== Math.floor(resolvedHeight) ||
-    width * resolvedHeight !== length
+    resolvedWidth * resolvedHeight !== length
   ) {
     throw new Error(
       "applyPalette() requires { width, height } to match RGBA data when dithering",
@@ -31,25 +39,45 @@ export function applyPaletteDither(
   }
 
   const hasAlpha = format === "rgba4444";
-  const channels = hasAlpha ? 4 : 3;
+  const channels = temporalDitherChannels(format);
+  const temporalErrors = temporalDither
+    ? getTemporalDitherBuffer(
+        temporalDither,
+        format,
+        resolvedWidth,
+        resolvedHeight,
+        "applyPalette",
+      )
+    : null;
   const pixels = new Float32Array(length * channels);
   const index = new Uint8Array(length);
 
   for (let i = 0, j = 0; i < rgba.length; i += 4, j += channels) {
-    pixels[j] = byteAt(rgba, i);
-    pixels[j + 1] = byteAt(rgba, i + 1);
-    pixels[j + 2] = byteAt(rgba, i + 2);
-    if (hasAlpha) pixels[j + 3] = byteAt(rgba, i + 3);
+    const temporalStrength = temporalDither?.strength ?? 0;
+    pixels[j] =
+      byteAt(rgba, i) +
+      (temporalErrors ? (temporalErrors[j] ?? 0) * temporalStrength : 0);
+    pixels[j + 1] =
+      byteAt(rgba, i + 1) +
+      (temporalErrors ? (temporalErrors[j + 1] ?? 0) * temporalStrength : 0);
+    pixels[j + 2] =
+      byteAt(rgba, i + 2) +
+      (temporalErrors ? (temporalErrors[j + 2] ?? 0) * temporalStrength : 0);
+    if (hasAlpha) {
+      pixels[j + 3] =
+        byteAt(rgba, i + 3) +
+        (temporalErrors ? (temporalErrors[j + 3] ?? 0) * temporalStrength : 0);
+    }
   }
 
   for (let y = 0; y < resolvedHeight; y++) {
     const reverse = serpentine && y % 2 === 1;
-    const xStart = reverse ? width - 1 : 0;
-    const xEnd = reverse ? -1 : width;
+    const xStart = reverse ? resolvedWidth - 1 : 0;
+    const xEnd = reverse ? -1 : resolvedWidth;
     const step = reverse ? -1 : 1;
 
     for (let x = xStart; x !== xEnd; x += step) {
-      const idx = y * width + x;
+      const idx = y * resolvedWidth + x;
       const pixelOffset = idx * channels;
       const r = clampByte(pixels[pixelOffset] ?? 0);
       const g = clampByte(pixels[pixelOffset + 1] ?? 0);
@@ -66,24 +94,68 @@ export function applyPaletteDither(
       }
 
       index[idx] = paletteIndex;
-      diffuseError(
-        pixels,
-        channels,
-        width,
-        resolvedHeight,
-        x,
-        y,
-        reverse,
-        ditherStrength,
-        r - red(color),
-        g - green(color),
-        b - blue(color),
-        hasAlpha ? a - alpha(color) : 0,
-      );
+      const er = r - red(color);
+      const eg = g - green(color);
+      const eb = b - blue(color);
+      const ea = hasAlpha ? a - alpha(color) : 0;
+
+      if (temporalDither && temporalErrors) {
+        storeTemporalError(
+          temporalErrors,
+          pixelOffset,
+          temporalDither,
+          channels,
+          er,
+          eg,
+          eb,
+          ea,
+        );
+      }
+
+      if (opts.dither) {
+        diffuseError(
+          pixels,
+          channels,
+          resolvedWidth,
+          resolvedHeight,
+          x,
+          y,
+          reverse,
+          ditherStrength,
+          er,
+          eg,
+          eb,
+          ea,
+        );
+      }
     }
   }
 
   return index;
+}
+
+function storeTemporalError(
+  errors: Float32Array,
+  offset: number,
+  state: NonNullable<NormalizedApplyPaletteOptions["temporalDither"]>,
+  channels: number,
+  er: number,
+  eg: number,
+  eb: number,
+  ea: number,
+): void {
+  errors[offset] = clampError(er * state.decay, state.maxError);
+  errors[offset + 1] = clampError(eg * state.decay, state.maxError);
+  errors[offset + 2] = clampError(eb * state.decay, state.maxError);
+  if (channels === 4) {
+    errors[offset + 3] = clampError(ea * state.decay, state.maxError);
+  }
+}
+
+function clampError(value: number, maxError: number): number {
+  if (value < -maxError) return -maxError;
+  if (value > maxError) return maxError;
+  return value;
 }
 
 function diffuseError(

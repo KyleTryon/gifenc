@@ -1,6 +1,11 @@
 import { normalizeFormat } from "../validation.js";
 import { describeValue } from "./utils.js";
-import type { ApplyPaletteOptions, DitherAlgorithm, Format } from "../types.js";
+import type {
+  ApplyPaletteOptions,
+  DitherAlgorithm,
+  Format,
+  TemporalDitherState,
+} from "../types.js";
 
 export type NormalizedApplyPaletteOptions = {
   format: Format;
@@ -9,6 +14,7 @@ export type NormalizedApplyPaletteOptions = {
   height: number | undefined;
   ditherStrength: number;
   serpentine: boolean;
+  temporalDither: TemporalDitherState | null;
 };
 
 export function normalizeApplyPaletteOptions(
@@ -22,6 +28,7 @@ export function normalizeApplyPaletteOptions(
       height: undefined,
       ditherStrength: 1,
       serpentine: true,
+      temporalDither: null,
     };
   }
   if (options == null) {
@@ -32,6 +39,7 @@ export function normalizeApplyPaletteOptions(
       height: undefined,
       ditherStrength: 1,
       serpentine: true,
+      temporalDither: null,
     };
   }
   if (typeof options !== "object") {
@@ -61,6 +69,19 @@ export function normalizeApplyPaletteOptions(
     }
   }
 
+  const rawTemporalDither: unknown = options.temporalDither;
+  let temporalDither: TemporalDitherState | null = null;
+  if (rawTemporalDither != null && rawTemporalDither !== false) {
+    if (typeof rawTemporalDither !== "object") {
+      throw new Error(
+        `applyPalette() unsupported temporalDither value: ${describeValue(
+          rawTemporalDither,
+        )}`,
+      );
+    }
+    temporalDither = rawTemporalDither as TemporalDitherState;
+  }
+
   return {
     format: normalizeFormat(options.format, "applyPalette"),
     dither: dither || false,
@@ -68,5 +89,6 @@ export function normalizeApplyPaletteOptions(
     height: options.height,
     ditherStrength: Math.max(0, ditherStrength),
     serpentine: options.serpentine !== false,
+    temporalDither,
   };
 }
