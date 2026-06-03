@@ -24,6 +24,30 @@ Some features that could be explored in a future version:
 - Optimizations for FireFox
 - Support Interlacing
 
+## Install
+
+This fork is published to npm as `@techsquidtv/gifenc`.
+
+```sh
+npm install @techsquidtv/gifenc
+```
+
+Use it from Node.js or a bundler:
+
+```js
+import { GIFEncoder, quantize, applyPalette } from "@techsquidtv/gifenc";
+```
+
+Or import it directly in the browser from a CDN:
+
+```js
+import {
+  GIFEncoder,
+  quantize,
+  applyPalette,
+} from "https://unpkg.com/@techsquidtv/gifenc";
+```
+
 ## Example
 
 You can see a simple browser example [here](https://codepen.io/mattdesl/full/vYypMXv).
@@ -35,11 +59,7 @@ Also see [./examples/node/encode.ts](./examples/node/encode.ts) for a pure Node.
 Basic code example:
 
 ```js
-import {
-  GIFEncoder,
-  quantize,
-  applyPalette,
-} from "https://unpkg.com/@techsquidtv/gifenc";
+import { GIFEncoder, quantize, applyPalette } from "@techsquidtv/gifenc";
 
 // Get your RGBA image into Uint8Array data, such as from canvas
 const { data, width, height } = /* ... getImageData() ... */;
