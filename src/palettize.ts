@@ -10,6 +10,11 @@ import {
   assertRgbaInput,
   createUint32PixelView,
 } from "./rgba.js";
+import {
+  assertPalette,
+  assertPaletteMatchesFormat,
+  normalizeFormat,
+} from "./validation.js";
 
 import type {
   ApplyPaletteOptions,
@@ -136,11 +141,10 @@ export function applyPalette(
   options: Format | ApplyPaletteOptions | null = "rgb565",
 ): Uint8Array {
   assertRgbaInput(rgba, "applyPalette");
-  if (palette.length > 256) {
-    throw new Error("applyPalette() only works with 256 colors or less");
-  }
 
   const opts = normalizeApplyPaletteOptions(options);
+  assertPalette(palette, "applyPalette");
+  assertPaletteMatchesFormat(palette, opts.format, "applyPalette");
   const { format } = opts;
   if (opts.dither) {
     return applyPaletteDither(rgba, palette, opts);
@@ -195,7 +199,7 @@ function normalizeApplyPaletteOptions(
 ): NormalizedApplyPaletteOptions {
   if (typeof options === "string") {
     return {
-      format: options,
+      format: normalizeFormat(options, "applyPalette"),
       dither: false,
       width: undefined,
       height: undefined,
@@ -241,7 +245,7 @@ function normalizeApplyPaletteOptions(
   }
 
   return {
-    format: options.format || "rgb565",
+    format: normalizeFormat(options.format, "applyPalette"),
     dither: dither || false,
     width: options.width,
     height: options.height,

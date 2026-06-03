@@ -2,6 +2,7 @@ import constants from "./constants.js";
 import lzwEncode from "./lzwEncode.js";
 import createStream from "./stream.js";
 import quantize from "./pnnquant2.js";
+import { assertPalette } from "./validation.js";
 import type {
   ByteStream,
   ByteArray,
@@ -86,12 +87,21 @@ function GIFEncoder(opt: GIFEncoderOptions = {}): GIFEncoderInstance {
 
       width = Math.max(0, Math.floor(width));
       height = Math.max(0, Math.floor(height));
+      if (width < 1 || height < 1) {
+        throw new Error("GIFEncoder.writeFrame() expected positive dimensions");
+      }
+      if (index.length !== width * height) {
+        throw new Error(
+          "GIFEncoder.writeFrame() expected index length to match width * height",
+        );
+      }
 
       // Write pre-frame details such as repeat count and global palette
       if (first) {
         if (!palette) {
           throw new Error("First frame must include a { palette } option");
         }
+        assertPalette(palette, "GIFEncoder.writeFrame");
         encodeLogicalScreenDescriptor(
           stream,
           width,
@@ -115,6 +125,9 @@ function GIFEncoder(opt: GIFEncoderOptions = {}): GIFEncoderInstance {
       );
 
       const localPalette = palette && !first ? palette : null;
+      if (localPalette) {
+        assertPalette(localPalette, "GIFEncoder.writeFrame");
+      }
       encodeImageDescriptor(stream, width, height, localPalette);
       if (localPalette) encodeColorTable(stream, localPalette);
       encodePixels(

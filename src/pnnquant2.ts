@@ -12,6 +12,7 @@ import {
   rgba8888_to_rgba4444,
 } from "./rgb-packing.js";
 import { assertRgbaInput, createUint32PixelView } from "./rgba.js";
+import { assertMaxColors, normalizeFormat } from "./validation.js";
 
 import type {
   Color,
@@ -196,7 +197,6 @@ export default function quantize(
   opts: QuantizeOptions = {},
 ): Palette {
   const {
-    format = "rgb565",
     clearAlpha = true,
     clearAlphaColor = 0x00,
     clearAlphaThreshold = 0,
@@ -204,6 +204,8 @@ export default function quantize(
   } = opts;
 
   assertRgbaInput(rgba, "quantize");
+  assertMaxColors(maxColors, "quantize");
+  const format = normalizeFormat(opts.format, "quantize");
   const data = createUint32PixelView(rgba, "quantize");
 
   let useSqrt = opts.useSqrt !== false;
