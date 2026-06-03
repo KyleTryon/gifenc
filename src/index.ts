@@ -7,7 +7,7 @@ export {
   nearestColorIndexWithDistance,
   prequantize,
   snapColorsToPalette,
-} from "./palettize.js";
+} from "./palette/index.js";
 
 export type {
   ApplyPaletteOptions,
