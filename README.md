@@ -11,15 +11,15 @@ A fast and lightweight pure-JavaScript GIF encoder. Features:
 - Can be used across multiple web workers for multi-core devices
 - Allows full control over encoding indexed bitmaps & per frame color palette
 - Fast built-in color quantizer based on a port of PnnQuant.js, which is based on "Pairwise Nearest Neighbor Clustering" [1](https://pdfs.semanticscholar.org/68b4/236e77d6026943ffa009d8b3553ace09a922.pdf) [2](https://github.com/mcychan/PnnQuant.js) [3](https://github.com/mcychan/nQuant.j2se)
-- Fast built-in palette mapping (reducing colors to their nearest paletted index)
+- Fast built-in palette mapping (reducing colors to their nearest paletted index), with optional Floyd-Steinberg dithering
 
-This library is a little lower level than something like [GIF.js](https://jnordberg.github.io/gif.js/), but gives much better speed (i.e. often more than twice as fast) with similar visual results for many types of images. Because there is currently no dithering support, and because of the current choice of color quantizer, this encoder is probably best suited for simple flat-style vector graphics, rather than photographs or video that might need special handling across frames (e.g. temporal dithering) or better perceptual color quantizers.
+This library is a little lower level than something like [GIF.js](https://jnordberg.github.io/gif.js/), but gives much better speed (i.e. often more than twice as fast) with similar visual results for many types of images. Because of the current choice of color quantizer, this encoder is best suited for simple flat-style vector graphics, though optional Floyd-Steinberg dithering can help reduce banding in gradients, photographs, and other continuous-tone images. Some video-like animation may still need special handling across frames (e.g. temporal dithering) or better perceptual color quantizers.
 
 Some features that could be explored in a future version:
 
 - Alternative color quantizers
 - Alternative palette mapping (such as perceptually based)
-- Dithering support
+- Temporal dithering support
 - WASM-based speed optimizations
 - Optimizations for FireFox
 - Support Interlacing
@@ -81,7 +81,7 @@ Options:
 
 The return value `palette` is an array of arrays, and no greater than `maxColors` in length. Each array in the `palette` is either RGB or RGBA (depending on pixel format) such as `[ r, g, b ]` or `[ r, g, b, a ]` in bytes.
 
-### `index = applyPalette(rgba, palette, format = "rgb565")`
+### `index = applyPalette(rgba, palette, options = "rgb565")`
 
 This will determine the color index for each pixel in the `rgba` image. The pixel input is the same as the above function: to a flat `Uint8Array` or `Uint8ClampedArray` of per-pixel RGBA data.
 
@@ -97,7 +97,23 @@ const palette = [
 ];
 ```
 
-The `format` is the same as in `quantize`, and you can choose between opaque (RGB) and semi-transparent (RGBA) formats. You'll likely want to choose the same format you used to quantize your image.
+For backwards compatibility, `options` can be the `format` string. You can also pass an options object:
+
+- `format` (string, default `"rgb565"`) — this is the same as in `quantize`, and you can choose between opaque (RGB) and semi-transparent (RGBA) formats. You'll likely want to choose the same format you used to quantize your image.
+- `dither` (boolean|string, default `false`) — enables dithering. If set to `true`, this uses `"floyd-steinberg"` dithering. Currently, `"floyd-steinberg"` is the only supported algorithm.
+- `width` (number) — required when `dither` is enabled, so the dithering pass can detect row boundaries.
+- `height` (number, optional) — when specified, `width * height` must match the number of pixels in `rgba`. If omitted, it is inferred from `rgba.length / 4 / width`.
+- `ditherStrength` (number, default `1`) — scales how much quantization error is diffused into neighboring pixels.
+- `serpentine` (boolean, default `true`) — alternates scan direction on every row to reduce directional artifacts.
+
+```js
+const index = applyPalette(data, palette, {
+  format: "rgb565",
+  dither: "floyd-steinberg",
+  width,
+  height,
+});
+```
 
 ### `gif = GIFEncoder(opts = {})`
 
