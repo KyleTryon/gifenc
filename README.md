@@ -30,7 +30,7 @@ You can see a simple browser example [here](https://codepen.io/mattdesl/full/vYy
 
 You can see a more advanced example of this encoder in action inside [looom-tools.netlify.app](https://looom-tools.netlify.app/).
 
-Also see [./test/encode_node.js](./test/encode_node.js) for a pure Node.js example.
+Also see [./test/encode_node.js](./test/encode_node.js) for a pure Node.js example, or [./test/encode_node_dither.js](./test/encode_node_dither.js) for a Node example that writes both plain and dithered GIFs from the same source image.
 
 Basic code example:
 
@@ -57,6 +57,19 @@ gif.finish();
 
 // Get the Uint8Array output of your binary GIF file
 const output = gif.bytes();
+```
+
+To reduce banding in continuous-tone images, enable Floyd-Steinberg dithering when applying the palette. Dithering needs the image width so it can avoid diffusing color error across row boundaries.
+
+```js
+const format = "rgb565";
+const palette = quantize(data, 256, { format });
+const index = applyPalette(data, palette, {
+  format,
+  dither: "floyd-steinberg",
+  width,
+  height,
+});
 ```
 
 ## API
