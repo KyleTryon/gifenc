@@ -16,6 +16,19 @@ import type {
   RGBAInput,
 } from "../types.js";
 
+/**
+ * Map RGBA pixels to palette indexes.
+ *
+ * The returned `Uint8Array` contains one palette index per source pixel and can
+ * be passed directly to {@link GIFEncoderInstance.writeFrame}. The input RGBA
+ * array is not modified unless dithering is enabled, in which case error
+ * diffusion works on a copied work buffer.
+ *
+ * @param rgba - Flat RGBA pixel data in `[r, g, b, a, ...]` order.
+ * @param palette - Palette containing 1 to 256 RGB or RGBA colors.
+ * @param options - Palette format string or detailed mapping options.
+ * @returns Indexed pixels with length `rgba.length / 4`.
+ */
 export function applyPalette(
   rgba: RGBAInput,
   palette: Palette,

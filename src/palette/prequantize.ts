@@ -2,6 +2,16 @@ import { assertRgbaInput, createUint32PixelView } from "../rgba.js";
 import { roundStep, uint32At } from "./utils.js";
 import type { PrequantizeOptions, RGBAInput } from "../types.js";
 
+/**
+ * Mutate RGBA pixels in place to reduce color precision before quantization.
+ *
+ * This can improve palette stability or reduce dithering noise before calling
+ * {@link quantize}. Because this function mutates `rgba`, pass a copy if the
+ * original pixel data is still needed.
+ *
+ * @param rgba - Flat RGBA pixel data in `[r, g, b, a, ...]` order.
+ * @param options - Channel rounding and alpha threshold options.
+ */
 export function prequantize(
   rgba: RGBAInput,
   {

@@ -191,6 +191,20 @@ function createBinList(data: Uint32Array, format: Format): BinList {
   return bins;
 }
 
+/**
+ * Reduce flat RGBA pixel data to a GIF-compatible palette.
+ *
+ * The returned palette contains up to `maxColors` RGB or RGBA colors depending
+ * on the selected {@link Format}. Use `"rgba4444"` when the palette itself
+ * should preserve alpha; otherwise transparent pixels are typically handled by
+ * a transparent palette index when writing frames.
+ *
+ * @param rgba - Flat RGBA pixel data in `[r, g, b, a, ...]` order.
+ * @param maxColors - Maximum palette size, from 1 to 256.
+ * @param opts - Quantization options.
+ * @returns A palette suitable for {@link applyPalette} and
+ * {@link GIFEncoderInstance.writeFrame}.
+ */
 export default function quantize(
   rgba: RGBAInput,
   maxColors: number,

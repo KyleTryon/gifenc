@@ -65,6 +65,16 @@ export function nearestColorIndexRGB(
   return k;
 }
 
+/**
+ * Replace near-matching palette entries with known colors in place.
+ *
+ * This is useful when a generated palette should preserve exact brand colors or
+ * transparency keys after quantization.
+ *
+ * @param palette - Palette to mutate.
+ * @param knownColors - Preferred colors to snap into the palette.
+ * @param threshold - Maximum Euclidean RGB distance for replacement.
+ */
 export function snapColorsToPalette(
   palette: Palette,
   knownColors: Palette,
@@ -100,6 +110,15 @@ export function snapColorsToPalette(
   }
 }
 
+/**
+ * Find the index of the nearest color in a palette-like list.
+ *
+ * @param colors - Candidate colors.
+ * @param pixel - Color to match.
+ * @param distanceFn - Optional distance function. Defaults to squared
+ * Euclidean distance.
+ * @returns The nearest color index, or `-1` when `colors` is empty.
+ */
 export function nearestColorIndex(
   colors: Palette,
   pixel: readonly number[],
@@ -118,6 +137,16 @@ export function nearestColorIndex(
   return minDistIndex;
 }
 
+/**
+ * Find the nearest color index and distance in one pass.
+ *
+ * @param colors - Candidate colors.
+ * @param pixel - Color to match.
+ * @param distanceFn - Optional distance function. Defaults to squared
+ * Euclidean distance.
+ * @returns A tuple of `[index, distance]`, with index `-1` and distance
+ * `Infinity` when `colors` is empty.
+ */
 export function nearestColorIndexWithDistance(
   colors: Palette,
   pixel: readonly number[],
@@ -136,6 +165,15 @@ export function nearestColorIndexWithDistance(
   return [minDistIndex, minDist];
 }
 
+/**
+ * Find the nearest color in a palette-like list.
+ *
+ * @param colors - Candidate colors.
+ * @param pixel - Color to match.
+ * @param distanceFn - Optional distance function. Defaults to squared
+ * Euclidean distance.
+ * @returns The nearest color, or `undefined` when `colors` is empty.
+ */
 export function nearestColor(
   colors: Palette,
   pixel: readonly number[],

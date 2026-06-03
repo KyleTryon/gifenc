@@ -11,6 +11,22 @@ import type {
   Palette,
 } from "./types.js";
 
+/**
+ * Create a stateful GIF encoder.
+ *
+ * The usual flow is:
+ *
+ * 1. Create a palette with {@link quantize}.
+ * 2. Convert RGBA pixels to palette indexes with {@link applyPalette}.
+ * 3. Write one or more indexed frames.
+ * 4. Call {@link GIFEncoderInstance.finish} and read the bytes.
+ *
+ * In default auto mode, the encoder writes the GIF header and global color
+ * table when the first frame is written.
+ *
+ * @param opt - Encoder configuration.
+ * @returns A mutable encoder instance.
+ */
 export function GIFEncoder(opt: GIFEncoderOptions = {}): GIFEncoderInstance {
   const { initialCapacity = 4096, auto = true } = opt;
 
