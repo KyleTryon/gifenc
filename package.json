@@ -1,5 +1,5 @@
 {
-  "name": "gifenc",
+  "name": "@techsquidtv/gifenc",
   "version": "1.0.3",
   "description": "very fast JS GIF encoder",
   "type": "module",
@@ -22,6 +22,10 @@
     "README.md",
     "LICENSE.md"
   ],
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org"
+  },
   "license": "MIT",
   "engines": {
     "node": ">=22.13.0"
@@ -75,10 +79,10 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git://github.com/mattdesl/gifenc.git"
+    "url": "git+https://github.com/KyleTryon/gifenc.git"
   },
-  "homepage": "https://github.com/mattdesl/gifenc",
+  "homepage": "https://github.com/KyleTryon/gifenc#readme",
   "bugs": {
-    "url": "https://github.com/mattdesl/gifenc/issues"
+    "url": "https://github.com/KyleTryon/gifenc/issues"
   }
 }

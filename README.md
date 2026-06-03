@@ -1,4 +1,4 @@
-# gifenc
+# @techsquidtv/gifenc
 
 [![experimental](http://badges.github.io/stability-badges/dist/experimental.svg)](http://github.com/badges/stability-badges)
 
@@ -35,7 +35,11 @@ Also see [./examples/node/encode.ts](./examples/node/encode.ts) for a pure Node.
 Basic code example:
 
 ```js
-import { GIFEncoder, quantize, applyPalette } from 'https://unpkg.com/gifenc';
+import {
+  GIFEncoder,
+  quantize,
+  applyPalette,
+} from "https://unpkg.com/@techsquidtv/gifenc";
 
 // Get your RGBA image into Uint8Array data, such as from canvas
 const { data, width, height } = /* ... getImageData() ... */;
@@ -274,4 +278,4 @@ The code here has been forked/inspired/remixed from these libraries:
 
 ## License
 
-MIT, see [LICENSE.md](http://github.com/mattdesl/gifenc/blob/master/LICENSE.md) for details.
+MIT, see [LICENSE.md](https://github.com/KyleTryon/gifenc/blob/main/LICENSE.md) for details.
