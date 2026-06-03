@@ -139,6 +139,25 @@ Temporal dithering state is mutable and sequence-scoped. Do not share one state
 between unrelated animations or concurrent encodes; create separate states, or
 call `reset()` before reusing a state for a new sequence.
 
+By default, temporal dithering also uses change detection to reject stale
+history across large motion or scene changes. This clears carried error for
+changed pixels, and resets the whole history when most of the frame changes:
+
+```js
+const temporalDither = createTemporalDither({
+  width,
+  height,
+  format,
+  changeDetection: {
+    pixelThreshold: 48,
+    sceneChangeRatio: 0.75,
+  },
+});
+```
+
+Set `changeDetection: false` if you want exact residual carry between every
+frame or prefer to call `reset()` manually at known cuts.
+
 ## API
 
 ### `quantize(rgba, maxColors, options)`
@@ -186,8 +205,12 @@ Creates resettable temporal dithering state for an animation.
 - `options.strength`: scales previous-frame carried error.
 - `options.decay`: scales newly carried error for the next frame.
 - `options.maxError`: clamps carried per-channel error.
+- `options.changeDetection`: rejects stale temporal history after large source
+  changes. Defaults to `true`, with `pixelThreshold: 48` and
+  `sceneChangeRatio: 0.75`.
 
-Call `state.reset()` before reusing the state for an unrelated animation.
+Call `state.reset()` before reusing the state for an unrelated animation, or at
+known scene boundaries when managing cuts yourself.
 
 ### `GIFEncoder(options)`
 

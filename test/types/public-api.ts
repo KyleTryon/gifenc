@@ -10,6 +10,7 @@ import {
   type Palette,
   type RGB,
   type RGBA,
+  type TemporalDitherChangeDetectionOptions,
   type TemporalDitherOptions,
   type TemporalDitherState,
 } from "../../src/index.js";
@@ -36,15 +37,31 @@ const temporalOptions: TemporalDitherOptions = {
   width: 1,
   height: 1,
   decay: 0.8,
+  changeDetection: true,
+};
+const changeDetection: TemporalDitherChangeDetectionOptions = {
+  pixelThreshold: 48,
+  sceneChangeRatio: 0.75,
 };
 const temporalDither: TemporalDitherState =
   createTemporalDither(temporalOptions);
 
 applyPalette(rgbaData, quantized, paletteOptions);
+createTemporalDither({
+  width: 1,
+  height: 1,
+  changeDetection,
+});
+createTemporalDither({
+  width: 1,
+  height: 1,
+  changeDetection: false,
+});
 applyPalette(rgbaData, palette, {
   temporalDither,
 });
 temporalDither.reset();
+const normalizedChangeDetection = temporalDither.changeDetection;
 GIFEncoder().writeFrame(indexed, 1, 1, { palette: [rgb] });
 
 const nearestIndex: number = nearestColorIndex(palette, rgb);
@@ -55,6 +72,7 @@ const nearestWithDistance: [number, number] = nearestColorIndexWithDistance(
 
 void nearestIndex;
 void nearestWithDistance;
+void normalizedChangeDetection;
 
 // @ts-expect-error invalid color format
 quantize(rgbaData, 2, { format: "rgb666" });
@@ -74,6 +92,13 @@ applyPalette(rgbaData, palette, {
 applyPalette(rgbaData, palette, {
   // @ts-expect-error temporalDither expects state from createTemporalDither
   temporalDither: true,
+});
+
+createTemporalDither({
+  width: 1,
+  height: 1,
+  // @ts-expect-error changeDetection expects boolean or options object
+  changeDetection: "yes",
 });
 
 void invalidColor;

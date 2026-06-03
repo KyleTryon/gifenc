@@ -1,6 +1,10 @@
 import { assertRgbaByteLength } from "../rgba.js";
 import { nearestColorIndexRGB, nearestColorIndexRGBA } from "./nearest.js";
-import { getTemporalDitherBuffer, temporalDitherChannels } from "./temporal.js";
+import {
+  commitTemporalDitherFrame,
+  prepareTemporalDitherFrame,
+  temporalDitherChannels,
+} from "./temporal.js";
 import { alpha, blue, byteAt, green, red } from "./utils.js";
 import type { Palette, RGBAInput } from "../types.js";
 import type { NormalizedApplyPaletteOptions } from "./options.js";
@@ -41,8 +45,9 @@ export function applyPaletteDither(
   const hasAlpha = format === "rgba4444";
   const channels = temporalDitherChannels(format);
   const temporalErrors = temporalDither
-    ? getTemporalDitherBuffer(
+    ? prepareTemporalDitherFrame(
         temporalDither,
+        rgba,
         format,
         resolvedWidth,
         resolvedHeight,
@@ -50,23 +55,36 @@ export function applyPaletteDither(
       )
     : null;
   const pixels = new Float32Array(length * channels);
+  const temporalPixels = temporalErrors
+    ? new Float32Array(length * channels)
+    : null;
   const index = new Uint8Array(length);
 
   for (let i = 0, j = 0; i < rgba.length; i += 4, j += channels) {
     const temporalStrength = temporalDither?.strength ?? 0;
-    pixels[j] =
+    const r =
       byteAt(rgba, i) +
       (temporalErrors ? (temporalErrors[j] ?? 0) * temporalStrength : 0);
-    pixels[j + 1] =
+    const g =
       byteAt(rgba, i + 1) +
       (temporalErrors ? (temporalErrors[j + 1] ?? 0) * temporalStrength : 0);
-    pixels[j + 2] =
+    const b =
       byteAt(rgba, i + 2) +
       (temporalErrors ? (temporalErrors[j + 2] ?? 0) * temporalStrength : 0);
+    pixels[j] = r;
+    pixels[j + 1] = g;
+    pixels[j + 2] = b;
+    if (temporalPixels) {
+      temporalPixels[j] = r;
+      temporalPixels[j + 1] = g;
+      temporalPixels[j + 2] = b;
+    }
     if (hasAlpha) {
-      pixels[j + 3] =
+      const a =
         byteAt(rgba, i + 3) +
         (temporalErrors ? (temporalErrors[j + 3] ?? 0) * temporalStrength : 0);
+      pixels[j + 3] = a;
+      if (temporalPixels) temporalPixels[j + 3] = a;
     }
   }
 
@@ -99,16 +117,22 @@ export function applyPaletteDither(
       const eb = b - blue(color);
       const ea = hasAlpha ? a - alpha(color) : 0;
 
-      if (temporalDither && temporalErrors) {
+      if (temporalDither && temporalErrors && temporalPixels) {
+        const tr = clampByte(temporalPixels[pixelOffset] ?? 0);
+        const tg = clampByte(temporalPixels[pixelOffset + 1] ?? 0);
+        const tb = clampByte(temporalPixels[pixelOffset + 2] ?? 0);
+        const ta = hasAlpha
+          ? clampByte(temporalPixels[pixelOffset + 3] ?? 0xff)
+          : 0xff;
         storeTemporalError(
           temporalErrors,
           pixelOffset,
           temporalDither,
           channels,
-          er,
-          eg,
-          eb,
-          ea,
+          tr - red(color),
+          tg - green(color),
+          tb - blue(color),
+          hasAlpha ? ta - alpha(color) : 0,
         );
       }
 
@@ -129,6 +153,17 @@ export function applyPaletteDither(
         );
       }
     }
+  }
+
+  if (temporalDither) {
+    commitTemporalDitherFrame(
+      temporalDither,
+      rgba,
+      format,
+      resolvedWidth,
+      resolvedHeight,
+      "applyPalette",
+    );
   }
 
   return index;

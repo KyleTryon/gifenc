@@ -133,6 +133,24 @@ export type PrequantizeOptions = {
 };
 
 /**
+ * Options for temporal dithering change detection.
+ */
+export type TemporalDitherChangeDetectionOptions = {
+  /**
+   * Euclidean color-distance threshold for rejecting a pixel's carried error.
+   *
+   * Defaults to `48`.
+   */
+  pixelThreshold?: number;
+  /**
+   * Changed-pixel ratio that clears all carried error for the frame.
+   *
+   * Defaults to `0.75`.
+   */
+  sceneChangeRatio?: number;
+};
+
+/**
  * Options for {@link createTemporalDither}.
  */
 export type TemporalDitherOptions = {
@@ -166,6 +184,12 @@ export type TemporalDitherOptions = {
    * Defaults to `128`.
    */
   maxError?: number;
+  /**
+   * Reject carried error when source pixels change sharply.
+   *
+   * Defaults to `true`.
+   */
+  changeDetection?: boolean | TemporalDitherChangeDetectionOptions;
 };
 
 /**
@@ -197,7 +221,17 @@ export type TemporalDitherState = {
    */
   readonly maxError: number;
   /**
-   * Clear all carried error before starting a new animation sequence.
+   * Normalized change-detection settings, or `false` when disabled.
+   */
+  readonly changeDetection:
+    | false
+    | {
+        readonly pixelThreshold: number;
+        readonly sceneChangeRatio: number;
+      };
+  /**
+   * Clear carried error and previous-frame history before starting a new
+   * animation sequence.
    */
   reset(): void;
 };

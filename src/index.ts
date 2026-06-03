@@ -28,6 +28,7 @@ export type {
   RGBA,
   RGBAInput,
   RGB,
+  TemporalDitherChangeDetectionOptions,
   TemporalDitherOptions,
   TemporalDitherState,
   WriteFrameOptions,
