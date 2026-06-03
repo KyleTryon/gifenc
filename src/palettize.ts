@@ -5,6 +5,11 @@ import {
 } from "./rgb-packing.js";
 
 import { euclideanDistanceSquared } from "./color.js";
+import {
+  assertRgbaByteLength,
+  assertRgbaInput,
+  createUint32PixelView,
+} from "./rgba.js";
 
 import type {
   ApplyPaletteOptions,
@@ -103,7 +108,8 @@ export function prequantize(
     oneBitAlpha = null,
   }: PrequantizeOptions = {},
 ): void {
-  const data = new Uint32Array(rgba.buffer);
+  assertRgbaInput(rgba, "prequantize");
+  const data = createUint32PixelView(rgba, "prequantize");
   for (let i = 0; i < data.length; i++) {
     const color = uint32At(data, i);
     let a = (color >> 24) & 0xff;
@@ -129,9 +135,7 @@ export function applyPalette(
   palette: Palette,
   options: Format | ApplyPaletteOptions | null = "rgb565",
 ): Uint8Array {
-  if (!(rgba instanceof Uint8Array) && !(rgba instanceof Uint8ClampedArray)) {
-    throw new Error("applyPalette() expected RGBA Uint8Array data");
-  }
+  assertRgbaInput(rgba, "applyPalette");
   if (palette.length > 256) {
     throw new Error("applyPalette() only works with 256 colors or less");
   }
@@ -142,7 +146,7 @@ export function applyPalette(
     return applyPaletteDither(rgba, palette, opts);
   }
 
-  const data = new Uint32Array(rgba.buffer);
+  const data = createUint32PixelView(rgba, "applyPalette");
   const length = data.length;
   const bincount = format === "rgb444" ? 4096 : 65536;
   const index = new Uint8Array(length);
@@ -252,6 +256,7 @@ function applyPaletteDither(
   opts: NormalizedApplyPaletteOptions,
 ): Uint8Array {
   const { format, width, height, ditherStrength, serpentine } = opts;
+  assertRgbaByteLength(rgba, "applyPalette");
   const length = rgba.length / 4;
   if (length !== Math.floor(length)) {
     throw new Error("applyPalette() expected RGBA data length to divide by 4");

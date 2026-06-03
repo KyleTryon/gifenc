@@ -11,6 +11,7 @@ import {
   rgb888_to_rgb444,
   rgba8888_to_rgba4444,
 } from "./rgb-packing.js";
+import { assertRgbaInput, createUint32PixelView } from "./rgba.js";
 
 import type {
   Color,
@@ -202,11 +203,8 @@ export default function quantize(
     oneBitAlpha = false,
   } = opts;
 
-  if (!(rgba instanceof Uint8Array) && !(rgba instanceof Uint8ClampedArray)) {
-    throw new Error("quantize() expected RGBA Uint8Array data");
-  }
-
-  const data = new Uint32Array(rgba.buffer);
+  assertRgbaInput(rgba, "quantize");
+  const data = createUint32PixelView(rgba, "quantize");
 
   let useSqrt = opts.useSqrt !== false;
 
