@@ -30,7 +30,7 @@ You can see a simple browser example [here](https://codepen.io/mattdesl/full/vYy
 
 You can see a more advanced example of this encoder in action inside [looom-tools.netlify.app](https://looom-tools.netlify.app/).
 
-Also see [./test/encode_node.js](./test/encode_node.js) for a pure Node.js example, or [./test/encode_node_dither.js](./test/encode_node_dither.js) for a Node example that writes both plain and dithered GIFs from the same source image.
+Also see [./examples/node/encode.ts](./examples/node/encode.ts) for a pure Node.js example, or [./examples/node/encode-dither.ts](./examples/node/encode-dither.ts) for a Node example that writes both plain and dithered GIFs from the same source image.
 
 Basic code example:
 
@@ -208,7 +208,7 @@ The simplest architecture, and the one used in my [Looom exporter](https://githu
 - Send the encoded bytes view back to the main thread, which will store the chunk into a linear array
 - Once all streams have been encoded and their workers responded with encoded chunks, you can write all frames sequentially into a single GIF stream
 
-There is an example of this in [./test/encode_web_workers.html](./test/encode_web_workers.html) which uses [./test/worker.js](./test/worker.js). Future versions of this library might include a pre-bundled worker API built-in for easier use.
+There is an example of this in [./examples/browser/encode-workers.html](./examples/browser/encode-workers.html) which uses [./examples/browser/worker.js](./examples/browser/worker.js). Future versions of this library might include a pre-bundled worker API built-in for easier use.
 
 ## How GIF Encoding Works
 
@@ -226,33 +226,37 @@ There's some situations where you might need to change the way you approach thes
 
 Git clone this repo, then:
 
+Use Node.js 24.16.0 LTS with pnpm 11. The package supports Node.js 22.13.0 and newer for development tooling.
+
 ```sh
-npm install
+pnpm install
 ```
 
 To run the node test:
 
 ```sh
-node test/encode_node.js
+pnpm run build
+node examples/node/encode.ts
 ```
 
-And check `test/output/` folder for the result. Or to benchmark with node:
+And check `examples/node/output/` folder for the result. Or to benchmark with node:
 
 ```sh
 # re-build from source
-npm run dist:cjs
+pnpm run build
 
 # run benchmark
-node test/bench_node.js
+node bench/node/bench.ts
 ```
 
-Benchmarking/profiling is probably easier with Chrome, and this imports the source directly rather than built version:
+Benchmarking/profiling is probably easier with Chrome:
 
 ```sh
-npm run serve
+pnpm run build
+pnpm run serve
 ```
 
-Now navigate to [http://localhost:5000/test/bench_web.html](http://localhost:5000/test/bench_web.html).
+Now navigate to [http://localhost:5000/bench/browser/](http://localhost:5000/bench/browser/).
 
 Similarly, while serving you can
 
