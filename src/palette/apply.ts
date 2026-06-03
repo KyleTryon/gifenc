@@ -40,7 +40,7 @@ export function applyPalette(
   assertPalette(palette, "applyPalette");
   assertPaletteMatchesFormat(palette, opts.format, "applyPalette");
   const { format } = opts;
-  if (opts.dither) {
+  if (opts.dither || opts.temporalDither) {
     return applyPaletteDither(rgba, palette, opts);
   }
 

@@ -7,7 +7,7 @@
     "examples/browser/worker.js",
     "examples/node/encode.ts",
     "examples/node/encode-dither.ts",
-    "test/types/public-api.ts"
+    "test/**/*.test.mjs"
   ],
   "project": [
     "src/**/*.ts",
@@ -16,6 +16,7 @@
     "examples/**/*.js",
     "examples/**/*.ts",
     "scripts/**/*.mjs",
+    "test/**/*.mjs",
     "test/types/**/*.ts"
   ],
   "ignoreIssues": {

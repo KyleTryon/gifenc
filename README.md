@@ -32,7 +32,12 @@ npm install @techsquidtv/gifenc
 ```
 
 ```js
-import { GIFEncoder, quantize, applyPalette } from "@techsquidtv/gifenc";
+import {
+  GIFEncoder,
+  quantize,
+  applyPalette,
+  createTemporalDither,
+} from "@techsquidtv/gifenc";
 ```
 
 For direct browser imports, use the ESM build:
@@ -42,6 +47,7 @@ import {
   GIFEncoder,
   quantize,
   applyPalette,
+  createTemporalDither,
 } from "https://unpkg.com/@techsquidtv/gifenc/dist/gifenc.mjs";
 ```
 
@@ -110,6 +116,48 @@ const index = applyPalette(data, palette, {
 });
 ```
 
+For animations, temporal dithering can carry each pixel's quantization error
+into the next frame. Create one state object per animation and reuse it while
+mapping frames:
+
+```js
+const temporalDither = createTemporalDither({ width, height, format });
+
+for (const frame of frames) {
+  const palette = quantize(frame.data, 256, { format });
+  const index = applyPalette(frame.data, palette, {
+    format,
+    dither: "floyd-steinberg",
+    temporalDither,
+  });
+
+  gif.writeFrame(index, width, height, { palette, delay });
+}
+```
+
+Temporal dithering state is mutable and sequence-scoped. Do not share one state
+between unrelated animations or concurrent encodes; create separate states, or
+call `reset()` before reusing a state for a new sequence.
+
+By default, temporal dithering also uses change detection to reject stale
+history across large motion or scene changes. This clears carried error for
+changed pixels, and resets the whole history when most of the frame changes:
+
+```js
+const temporalDither = createTemporalDither({
+  width,
+  height,
+  format,
+  changeDetection: {
+    pixelThreshold: 48,
+    sceneChangeRatio: 0.75,
+  },
+});
+```
+
+Set `changeDetection: false` if you want exact residual carry between every
+frame or prefer to call `reset()` manually at known cuts.
+
 ## API
 
 ### `quantize(rgba, maxColors, options)`
@@ -143,8 +191,26 @@ Maps RGBA pixels to palette indexes.
 - `options.height`: optional consistency check for dithered input.
 - `options.ditherStrength`: scales propagated quantization error.
 - `options.serpentine`: alternates scan direction per row.
+- `options.temporalDither`: state returned by `createTemporalDither()`.
 
 Returns a `Uint8Array` with one palette index per pixel.
+
+### `createTemporalDither(options)`
+
+Creates resettable temporal dithering state for an animation.
+
+- `options.width`: frame width in pixels.
+- `options.height`: frame height in pixels.
+- `options.format`: `"rgb565"`, `"rgb444"`, or `"rgba4444"`.
+- `options.strength`: scales previous-frame carried error.
+- `options.decay`: scales newly carried error for the next frame.
+- `options.maxError`: clamps carried per-channel error.
+- `options.changeDetection`: rejects stale temporal history after large source
+  changes. Defaults to `true`, with `pixelThreshold: 48` and
+  `sceneChangeRatio: 0.75`.
+
+Call `state.reset()` before reusing the state for an unrelated animation, or at
+known scene boundaries when managing cuts yourself.
 
 ### `GIFEncoder(options)`
 

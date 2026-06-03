@@ -133,6 +133,110 @@ export type PrequantizeOptions = {
 };
 
 /**
+ * Options for temporal dithering change detection.
+ */
+export type TemporalDitherChangeDetectionOptions = {
+  /**
+   * Euclidean color-distance threshold for rejecting a pixel's carried error.
+   *
+   * Defaults to `48`.
+   */
+  pixelThreshold?: number;
+  /**
+   * Changed-pixel ratio that clears all carried error for the frame.
+   *
+   * Defaults to `0.75`.
+   */
+  sceneChangeRatio?: number;
+};
+
+/**
+ * Options for {@link createTemporalDither}.
+ */
+export type TemporalDitherOptions = {
+  /**
+   * Frame width in pixels.
+   */
+  width: number;
+  /**
+   * Frame height in pixels.
+   */
+  height: number;
+  /**
+   * Palette lookup format. Defaults to `"rgb565"`.
+   */
+  format?: Format;
+  /**
+   * Multiplier for the previous frame's carried quantization error.
+   *
+   * Defaults to `1`.
+   */
+  strength?: number;
+  /**
+   * Amount of newly computed quantization error to carry into the next frame.
+   *
+   * Defaults to `0.75`.
+   */
+  decay?: number;
+  /**
+   * Maximum absolute carried error per channel.
+   *
+   * Defaults to `128`.
+   */
+  maxError?: number;
+  /**
+   * Reject carried error when source pixels change sharply.
+   *
+   * Defaults to `true`.
+   */
+  changeDetection?: boolean | TemporalDitherChangeDetectionOptions;
+};
+
+/**
+ * Resettable per-animation state used for temporal dithering.
+ */
+export type TemporalDitherState = {
+  /**
+   * Frame width in pixels.
+   */
+  readonly width: number;
+  /**
+   * Frame height in pixels.
+   */
+  readonly height: number;
+  /**
+   * Palette lookup format used to size the carried error buffer.
+   */
+  readonly format: Format;
+  /**
+   * Multiplier for the previous frame's carried quantization error.
+   */
+  readonly strength: number;
+  /**
+   * Amount of newly computed quantization error to carry into the next frame.
+   */
+  readonly decay: number;
+  /**
+   * Maximum absolute carried error per channel.
+   */
+  readonly maxError: number;
+  /**
+   * Normalized change-detection settings, or `false` when disabled.
+   */
+  readonly changeDetection:
+    | false
+    | {
+        readonly pixelThreshold: number;
+        readonly sceneChangeRatio: number;
+      };
+  /**
+   * Clear carried error and previous-frame history before starting a new
+   * animation sequence.
+   */
+  reset(): void;
+};
+
+/**
  * Options for {@link applyPalette}.
  */
 export type ApplyPaletteOptions = {
@@ -166,6 +270,13 @@ export type ApplyPaletteOptions = {
    * Defaults to `false`.
    */
   serpentine?: boolean;
+  /**
+   * Carry quantization error across frames.
+   *
+   * Create this once per animation with {@link createTemporalDither}, then pass
+   * the same state while mapping each frame.
+   */
+  temporalDither?: TemporalDitherState | false | null;
 };
 
 /**
