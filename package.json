@@ -3,6 +3,7 @@
   "version": "1.0.3",
   "description": "very fast JS GIF encoder",
   "type": "module",
+  "packageManager": "npm@11.13.0",
   "main": "./dist/gifenc.cjs",
   "module": "./dist/gifenc.mjs",
   "types": "./dist/index.d.ts",
@@ -22,6 +23,21 @@
     "LICENSE.md"
   ],
   "license": "MIT",
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "devEngines": {
+    "runtime": {
+      "name": "node",
+      "version": ">=22.13.0",
+      "onFail": "error"
+    },
+    "packageManager": {
+      "name": "npm",
+      "version": ">=11.0.0",
+      "onFail": "error"
+    }
+  },
   "author": {
     "name": "Matt DesLauriers",
     "email": "dave.des@gmail.com",

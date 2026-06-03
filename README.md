@@ -226,6 +226,8 @@ There's some situations where you might need to change the way you approach thes
 
 Git clone this repo, then:
 
+Use Node.js 24.16.0 LTS with npm 11. The package supports Node.js 22.13.0 and newer for development tooling.
+
 ```sh
 npm install
 ```
