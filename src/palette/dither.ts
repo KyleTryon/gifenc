@@ -59,9 +59,9 @@ export function applyPaletteDither(
     ? new Float32Array(length * channels)
     : null;
   const index = new Uint8Array(length);
+  const temporalStrength = temporalDither?.strength ?? 0;
 
   for (let i = 0, j = 0; i < rgba.length; i += 4, j += channels) {
-    const temporalStrength = temporalDither?.strength ?? 0;
     const r =
       byteAt(rgba, i) +
       (temporalErrors ? (temporalErrors[j] ?? 0) * temporalStrength : 0);
