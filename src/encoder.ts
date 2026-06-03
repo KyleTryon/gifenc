@@ -1,5 +1,5 @@
 import constants from "./constants.js";
-import lzwEncode from "./lzwEncode.js";
+import lzwEncode from "./lzw-encode.js";
 import createStream from "./stream.js";
 import { assertPalette } from "./validation.js";
 import type {

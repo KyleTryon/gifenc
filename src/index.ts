@@ -1,5 +1,5 @@
 export { GIFEncoder, default } from "./encoder.js";
-export { default as quantize } from "./pnnquant2.js";
+export { default as quantize } from "./pnn-quant.js";
 export {
   applyPalette,
   nearestColor,
