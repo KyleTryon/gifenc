@@ -39,7 +39,9 @@ async function copyFile(relativePath) {
 }
 
 async function copyDirectory(relativePath) {
-  await cp(join(root, relativePath), join(site, relativePath), {
+  const target = join(site, relativePath);
+  await mkdir(dirname(target), { recursive: true });
+  await cp(join(root, relativePath), target, {
     recursive: true,
   });
 }

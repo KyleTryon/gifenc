@@ -106,6 +106,10 @@ const compareSelection = {
   right: "balanced-128-spatial-temporal",
 };
 
+window.addEventListener("beforeunload", () => {
+  revokeSourceBlobUrl();
+});
+
 init().catch((error) => {
   setStatus(`Could not load source video: ${error.message}`);
   console.error(error);
@@ -150,7 +154,7 @@ async function init() {
   }
 
   const sourceBlob = await response.blob();
-  sourceBlobUrl = URL.createObjectURL(sourceBlob);
+  setSourceBlobUrl(sourceBlob);
   sourceVideo.src = sourceBlobUrl;
   await waitForMetadata(sourceVideo);
 
@@ -184,8 +188,8 @@ async function runBenchmark() {
 
   for (const [index, variant] of variants.entries()) {
     setStatus(`Encoding ${variant.name}...`);
-    const progressOffset = (index / variants.length) * 100;
-    const progressSpan = 100 / variants.length;
+    const progressOffset = 10 + (index / variants.length) * 90;
+    const progressSpan = 90 / variants.length;
     const result = await encodeVariant(source, decodedFrames, variant, (part) =>
       setProgress(progressOffset + part * progressSpan),
     );
@@ -693,6 +697,17 @@ function setStatus(message) {
 
 function setProgress(value) {
   progressBar.value = Math.max(0, Math.min(100, value));
+}
+
+function setSourceBlobUrl(blob) {
+  revokeSourceBlobUrl();
+  sourceBlobUrl = URL.createObjectURL(blob);
+}
+
+function revokeSourceBlobUrl() {
+  if (!sourceBlobUrl) return;
+  URL.revokeObjectURL(sourceBlobUrl);
+  sourceBlobUrl = "";
 }
 
 function getContext(canvas) {
