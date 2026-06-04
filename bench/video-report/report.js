@@ -7,6 +7,22 @@ import {
 
 const SOURCE_URL = "../fixtures/basketball_5s_320p.mp4";
 const SOURCE_FPS = 24;
+const BLANK_GIF_URL =
+  "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==";
+const SKY_ROI = {
+  x: 0.03,
+  y: 0.05,
+  width: 0.36,
+  height: 0.21,
+};
+const SOFT_TEMPORAL_OPTIONS = {
+  strength: 0.45,
+  decay: 0.6,
+  maxError: 48,
+  changeDetection: {
+    pixelThreshold: 24,
+  },
+};
 
 const variants = [
   {
@@ -30,6 +46,17 @@ const variants = [
     ditherMode: "spatial-temporal",
   },
   {
+    id: "full-256-spatial-temporal-soft",
+    name: "Full 256 spatial + temporal soft",
+    scale: 1,
+    fps: 24,
+    colors: 256,
+    format: "rgb565",
+    paletteStrategy: "frame",
+    ditherMode: "spatial-temporal",
+    temporal: SOFT_TEMPORAL_OPTIONS,
+  },
+  {
     id: "balanced-128",
     name: "Balanced 128",
     scale: 1,
@@ -50,6 +77,17 @@ const variants = [
     ditherMode: "spatial",
   },
   {
+    id: "balanced-128-spatial-serpentine",
+    name: "Balanced 128 spatial serpentine",
+    scale: 1,
+    fps: 12,
+    colors: 128,
+    format: "rgb565",
+    paletteStrategy: "frame",
+    ditherMode: "spatial",
+    serpentine: true,
+  },
+  {
     id: "balanced-128-spatial-temporal",
     name: "Balanced 128 spatial + temporal",
     scale: 1,
@@ -58,6 +96,17 @@ const variants = [
     format: "rgb565",
     paletteStrategy: "frame",
     ditherMode: "spatial-temporal",
+  },
+  {
+    id: "balanced-128-spatial-temporal-soft",
+    name: "Balanced 128 spatial + temporal soft",
+    scale: 1,
+    fps: 12,
+    colors: 128,
+    format: "rgb565",
+    paletteStrategy: "frame",
+    ditherMode: "spatial-temporal",
+    temporal: SOFT_TEMPORAL_OPTIONS,
   },
   {
     id: "shared-palette-128",
@@ -101,6 +150,7 @@ let decodedFrames = null;
 let running = false;
 let resultUrls = [];
 let resultsById = new Map();
+let compareSyncToken = 0;
 const compareSelection = {
   left: "balanced-128-spatial",
   right: "balanced-128-spatial-temporal",
@@ -284,8 +334,10 @@ async function encodeVariant(metadata, frames, variant, onProgress) {
           width,
           height,
           format: variant.format,
+          ...variant.temporal,
         })
       : null;
+  const skyDiagnostics = createSkyDiagnostics(width, height);
   const encoder = GIFEncoder();
   const delay = 1000 / variant.fps;
 
@@ -303,12 +355,15 @@ async function encodeVariant(metadata, frames, variant, onProgress) {
         ? {
             format: variant.format,
             dither: "floyd-steinberg",
+            ditherStrength: variant.ditherStrength,
+            serpentine: variant.serpentine,
             width,
             height,
             temporalDither,
           }
         : variant.format,
     );
+    recordSkyDiagnostics(skyDiagnostics, rgba, palette, index);
 
     encoder.writeFrame(index, width, height, {
       delay,
@@ -336,6 +391,7 @@ async function encodeVariant(metadata, frames, variant, onProgress) {
     height,
     frameCount,
     encodeMs: performance.now() - started,
+    sky: finalizeSkyDiagnostics(skyDiagnostics),
   };
 }
 
@@ -398,12 +454,14 @@ function mergeFrames(frames) {
 
 function renderSourceMetrics(metadata) {
   sourceMetrics.innerHTML = "";
+  const roi = resolveSkyRoi(metadata.width, metadata.height);
   const metrics = [
     ["Dimensions", `${metadata.width} x ${metadata.height}`],
     ["Duration", `${formatNumber(metadata.duration, 1)}s`],
     ["Frame rate", `${metadata.fps} fps`],
     ["Frames", formatInteger(metadata.frameCount)],
     ["File size", formatBytes(metadata.size)],
+    ["Sky ROI", `${roi.width} x ${roi.height} at ${roi.x}, ${roi.y}`],
     [
       "Bit rate",
       `${formatNumber((metadata.size * 8) / metadata.duration / 1000, 0)} kbps`,
@@ -427,6 +485,9 @@ function renderSourceRow(metadata) {
     <td>${formatBytes(metadata.size)}</td>
     <td>1.00x</td>
     <td>n/a</td>
+    <td>n/a</td>
+    <td>n/a</td>
+    <td>n/a</td>
     <td><a class="download-link" href="${SOURCE_URL}">Open</a></td>
   `;
   resultsBody.append(row);
@@ -445,6 +506,9 @@ function renderVariantResult(metadata, variant, result) {
     <td>${ditherLabel(variant)}</td>
     <td>${formatBytes(result.bytes)}</td>
     <td>${formatNumber(ratio, 2)}x</td>
+    <td>${formatSkyMetric(result.sky.error, 2)}</td>
+    <td>${formatSkyMetric(result.sky.flicker, 2)}</td>
+    <td>${formatSkyMetric(result.sky.uniqueColors, 1)}</td>
     <td>${formatNumber(result.encodeMs / 1000, 2)}s</td>
     <td><a class="download-link" href="${result.url}" download="${variant.id}.gif">Download</a></td>
   `;
@@ -458,7 +522,7 @@ function renderVariantResult(metadata, variant, result) {
   card.innerHTML = `
     <h3>${variant.name}</h3>
     <p class="result-meta">
-      ${formatBytes(result.bytes)} / ${formatNumber(ratio, 2)}x MP4 / ${result.width} x ${result.height} / ${ditherLabel(variant)}
+      ${resultMeta(metadata, variant, result)}
     </p>
     <div class="media-frame">
       <img src="${result.url}" alt="${variant.name} GIF preview" />
@@ -515,10 +579,19 @@ function paletteLabel(variant) {
 
 function ditherLabel(variant) {
   if (variant.ditherMode === "spatial") {
-    return "spatial Floyd-Steinberg";
+    return joinLabels([
+      "spatial Floyd-Steinberg",
+      variant.serpentine ? "serpentine" : "",
+      ditherStrengthLabel(variant),
+    ]);
   }
   if (variant.ditherMode === "spatial-temporal") {
-    return "spatial Floyd-Steinberg + temporal dithering";
+    return joinLabels([
+      "spatial Floyd-Steinberg + temporal dithering",
+      variant.serpentine ? "serpentine" : "",
+      ditherStrengthLabel(variant),
+      temporalSettingsLabel(variant),
+    ]);
   }
   return "none";
 }
@@ -548,6 +621,7 @@ function renderCompareSelect(select, selectedValue) {
 function renderComparison() {
   renderComparePane(compareLeftPane, compareSelection.left);
   renderComparePane(compareRightPane, compareSelection.right);
+  scheduleCompareGifSync();
 }
 
 function renderComparePane(pane, choiceId) {
@@ -588,8 +662,56 @@ function renderComparePane(pane, choiceId) {
 
   const image = document.createElement("img");
   image.src = choice.result.url;
+  image.dataset.gifSrc = choice.result.url;
   image.alt = `${choice.name} GIF comparison preview`;
   mediaFrame.append(image);
+}
+
+function scheduleCompareGifSync() {
+  const token = ++compareSyncToken;
+  const images = [
+    ...compareLeftPane.querySelectorAll("img[data-gif-src]"),
+    ...compareRightPane.querySelectorAll("img[data-gif-src]"),
+  ];
+
+  if (images.length < 2) return;
+
+  Promise.all(images.map(waitForImageReady)).then(() => {
+    if (token !== compareSyncToken) return;
+
+    requestAnimationFrame(() => {
+      if (token !== compareSyncToken) return;
+
+      const sources = images.map((image) => image.dataset.gifSrc ?? image.src);
+      for (const image of images) {
+        image.src = BLANK_GIF_URL;
+      }
+
+      requestAnimationFrame(() => {
+        if (token !== compareSyncToken) return;
+        for (let i = 0; i < images.length; i++) {
+          const source = sources[i];
+          if (source) images[i].src = source;
+        }
+      });
+    });
+  });
+}
+
+function waitForImageReady(image) {
+  if (image.complete && image.naturalWidth > 0) {
+    return Promise.resolve();
+  }
+
+  return new Promise((resolve) => {
+    const done = () => {
+      image.removeEventListener("load", done);
+      image.removeEventListener("error", done);
+      resolve();
+    };
+    image.addEventListener("load", done);
+    image.addEventListener("error", done);
+  });
 }
 
 function getCompareChoices() {
@@ -645,14 +767,13 @@ function getCompareChoice(choiceId) {
     };
   }
 
-  const ratio = result.bytes / source.size;
   return {
     id: variant.id,
     name: variant.name,
     type: "gif",
     available: true,
     result,
-    meta: `${formatBytes(result.bytes)} / ${formatNumber(ratio, 2)}x MP4 / ${result.width} x ${result.height} / ${ditherLabel(variant)}`,
+    meta: resultMeta(source, variant, result),
     placeholder: "Waiting for benchmark result",
   };
 }
@@ -662,6 +783,139 @@ function usesSpatialDither(variant) {
     variant.ditherMode === "spatial" ||
     variant.ditherMode === "spatial-temporal"
   );
+}
+
+function createSkyDiagnostics(width, height) {
+  return {
+    roi: resolveSkyRoi(width, height),
+    frames: 0,
+    totalError: 0,
+    totalPixels: 0,
+    totalResidualDelta: 0,
+    residualSamples: 0,
+    totalUniqueColors: 0,
+    previousResiduals: null,
+  };
+}
+
+function recordSkyDiagnostics(stats, rgba, palette, index) {
+  const { x, y, width, height } = stats.roi;
+  const residuals = new Float32Array(width * height * 3);
+  const uniqueColors = new Set();
+  let residualOffset = 0;
+
+  for (let row = y; row < y + height; row++) {
+    for (let column = x; column < x + width; column++) {
+      const pixelIndex = row * stats.roi.frameWidth + column;
+      const sourceOffset = pixelIndex * 4;
+      const color = palette[index[pixelIndex]];
+      const sr = rgba[sourceOffset];
+      const sg = rgba[sourceOffset + 1];
+      const sb = rgba[sourceOffset + 2];
+      const er = color?.[0] ?? 0;
+      const eg = color?.[1] ?? 0;
+      const eb = color?.[2] ?? 0;
+      const rr = er - sr;
+      const rg = eg - sg;
+      const rb = eb - sb;
+
+      stats.totalError += Math.hypot(rr, rg, rb);
+      stats.totalPixels++;
+      uniqueColors.add(`${er},${eg},${eb}`);
+      residuals[residualOffset++] = rr;
+      residuals[residualOffset++] = rg;
+      residuals[residualOffset++] = rb;
+    }
+  }
+
+  if (stats.previousResiduals) {
+    for (let i = 0; i < residuals.length; i += 3) {
+      const rr = residuals[i] - stats.previousResiduals[i];
+      const rg = residuals[i + 1] - stats.previousResiduals[i + 1];
+      const rb = residuals[i + 2] - stats.previousResiduals[i + 2];
+      stats.totalResidualDelta += Math.hypot(rr, rg, rb);
+      stats.residualSamples++;
+    }
+  }
+
+  stats.previousResiduals = residuals;
+  stats.totalUniqueColors += uniqueColors.size;
+  stats.frames++;
+}
+
+function finalizeSkyDiagnostics(stats) {
+  return {
+    error: average(stats.totalError, stats.totalPixels),
+    flicker: average(stats.totalResidualDelta, stats.residualSamples),
+    uniqueColors: average(stats.totalUniqueColors, stats.frames),
+    roi: stats.roi,
+  };
+}
+
+function resolveSkyRoi(width, height) {
+  const x = Math.max(0, Math.round(width * SKY_ROI.x));
+  const y = Math.max(0, Math.round(height * SKY_ROI.y));
+  const roiWidth = Math.max(1, Math.round(width * SKY_ROI.width));
+  const roiHeight = Math.max(1, Math.round(height * SKY_ROI.height));
+  return {
+    x,
+    y,
+    width: Math.min(roiWidth, width - x),
+    height: Math.min(roiHeight, height - y),
+    frameWidth: width,
+    frameHeight: height,
+  };
+}
+
+function average(total, count) {
+  return count > 0 ? total / count : 0;
+}
+
+function resultMeta(metadata, variant, result) {
+  const ratio = result.bytes / metadata.size;
+  return `${formatBytes(result.bytes)} / ${formatNumber(ratio, 2)}x MP4 / ${result.width} x ${result.height} / ${ditherLabel(variant)} / sky ${formatSkyDiagnostics(result.sky)}`;
+}
+
+function formatSkyDiagnostics(sky) {
+  return `error ${formatSkyMetric(sky.error, 2)}, flicker ${formatSkyMetric(sky.flicker, 2)}, colors ${formatSkyMetric(sky.uniqueColors, 1)}`;
+}
+
+function formatSkyMetric(value, digits) {
+  return Number.isFinite(value) ? formatNumber(value, digits) : "n/a";
+}
+
+function ditherStrengthLabel(variant) {
+  if (variant.ditherStrength == null || variant.ditherStrength === 1) {
+    return "";
+  }
+  return `spatial strength ${formatNumber(variant.ditherStrength, 2)}`;
+}
+
+function temporalSettingsLabel(variant) {
+  if (!variant.temporal) return "";
+  const settings = [];
+  if (variant.temporal.strength != null) {
+    settings.push(`strength ${formatNumber(variant.temporal.strength, 2)}`);
+  }
+  if (variant.temporal.decay != null) {
+    settings.push(`decay ${formatNumber(variant.temporal.decay, 2)}`);
+  }
+  if (variant.temporal.maxError != null) {
+    settings.push(`max error ${formatNumber(variant.temporal.maxError, 0)}`);
+  }
+  if (variant.temporal.changeDetection?.pixelThreshold != null) {
+    settings.push(
+      `change ${formatNumber(
+        variant.temporal.changeDetection.pixelThreshold,
+        0,
+      )}`,
+    );
+  }
+  return settings.length ? `temporal ${settings.join(", ")}` : "";
+}
+
+function joinLabels(labels) {
+  return labels.filter(Boolean).join(", ");
 }
 
 function formatBytes(bytes) {
