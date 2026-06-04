@@ -60,7 +60,11 @@ const latestTag = git([
   "--abbrev=0",
 ]);
 const range = latestTag ? `${latestTag}..HEAD` : "HEAD";
-const rawLog = git(["log", "--format=%H%x00%s%x00%b%x1e", range]);
+const rawLog = execFileSync(
+  "git",
+  ["log", "--format=%H%x00%s%x00%b%x1e", range],
+  { encoding: "utf8", stdio: ["ignore", "pipe", "inherit"] },
+).trim();
 const commits = rawLog
   .split("\x1e")
   .map((record) => record.trim())
