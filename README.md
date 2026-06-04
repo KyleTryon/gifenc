@@ -331,6 +331,11 @@ This fork publishes publicly to npm as `@techsquidtv/gifenc`. Releases are
 intended to be created through the GitHub release workflow so version bumps,
 tags, generated release notes, and npm publishing stay together.
 
+The release workflow determines the version bump from commits since the latest
+`v*` tag. Breaking-change markers create a major release, `feat` commits create
+a minor release, and `fix`, `perf`, or `security` commits create a patch
+release.
+
 ## Credits
 
 Created from [Matt DesLauriers' `gifenc`](https://github.com/mattdesl/gifenc).
