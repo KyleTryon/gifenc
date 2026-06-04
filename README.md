@@ -297,6 +297,14 @@ Then open:
 - [http://localhost:5000/examples/browser/](http://localhost:5000/examples/browser/)
 - [http://localhost:5000/examples/browser/encode-workers.html](http://localhost:5000/examples/browser/encode-workers.html)
 - [http://localhost:5000/bench/browser/](http://localhost:5000/bench/browser/)
+- [http://localhost:5000/bench/video-report/](http://localhost:5000/bench/video-report/)
+
+The video GIF benchmark report can also be published manually to GitHub Pages
+from the `Benchmark Pages` workflow. The hosted report remains browser-based:
+visitors click `Run benchmark`, and their browser decodes the MP4 and encodes
+the GIF variants. Once deployed, open:
+
+- [https://kyletryon.github.io/gifenc/bench/video-report/](https://kyletryon.github.io/gifenc/bench/video-report/)
 
 ## Development
 
@@ -312,6 +320,8 @@ pnpm run check
 Useful scripts:
 
 - `pnpm run build`: builds ESM, CommonJS, and types into `dist`.
+- `pnpm run build:benchmark-pages`: builds the static GitHub Pages benchmark
+  artifact into `_site`.
 - `pnpm run check`: runs formatting, linting, type checks, and dependency checks.
 - `pnpm run serve`: starts the local example server.
 

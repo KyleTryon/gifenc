@@ -1,0 +1,602 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>gifenc video benchmark report</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --page: #f7f8f5;
+        --surface: #ffffff;
+        --surface-alt: #eef3f0;
+        --border: #cfd9d4;
+        --text: #202724;
+        --muted: #65736e;
+        --accent: #0f7b6c;
+        --accent-strong: #0b5f55;
+        --warning: #946b1f;
+        --shadow: 0 10px 30px rgb(31 42 38 / 10%);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-width: 320px;
+        background: var(--page);
+        color: var(--text);
+        font-family:
+          Inter,
+          ui-sans-serif,
+          system-ui,
+          -apple-system,
+          BlinkMacSystemFont,
+          "Segoe UI",
+          sans-serif;
+        line-height: 1.5;
+      }
+
+      button,
+      input,
+      select,
+      textarea {
+        font: inherit;
+      }
+
+      .shell {
+        width: min(1440px, calc(100% - 32px));
+        margin: 0 auto;
+        padding: 28px 0 40px;
+      }
+
+      .topbar {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 20px;
+        align-items: end;
+        padding-bottom: 22px;
+        border-bottom: 1px solid var(--border);
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin: 0;
+      }
+
+      h1 {
+        font-size: clamp(1.75rem, 4vw, 2.75rem);
+        line-height: 1.05;
+        letter-spacing: 0;
+      }
+
+      .lede {
+        max-width: 760px;
+        margin-top: 10px;
+        color: var(--muted);
+      }
+
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+        gap: 10px;
+      }
+
+      .button {
+        min-height: 42px;
+        border: 1px solid var(--accent);
+        border-radius: 8px;
+        padding: 0 16px;
+        background: var(--accent);
+        color: #ffffff;
+        cursor: pointer;
+        font-weight: 700;
+      }
+
+      .button.secondary {
+        background: var(--surface);
+        color: var(--accent-strong);
+      }
+
+      .button:disabled {
+        border-color: var(--border);
+        background: #d9dfdc;
+        color: #79847f;
+        cursor: not-allowed;
+      }
+
+      .status-row {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(180px, 320px);
+        gap: 16px;
+        align-items: center;
+        margin-top: 18px;
+      }
+
+      .status {
+        color: var(--muted);
+        min-height: 1.5em;
+      }
+
+      progress {
+        width: 100%;
+        height: 12px;
+        overflow: hidden;
+        border: 0;
+        border-radius: 999px;
+        background: #dde5e1;
+      }
+
+      progress::-webkit-progress-bar {
+        background: #dde5e1;
+      }
+
+      progress::-webkit-progress-value {
+        background: var(--accent);
+      }
+
+      progress::-moz-progress-bar {
+        background: var(--accent);
+      }
+
+      .source-grid {
+        display: grid;
+        grid-template-columns: minmax(280px, 1.15fr) minmax(280px, 0.85fr);
+        gap: 20px;
+        margin-top: 24px;
+      }
+
+      .panel {
+        min-width: 0;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: var(--surface);
+        box-shadow: var(--shadow);
+      }
+
+      .panel-header {
+        display: flex;
+        justify-content: space-between;
+        gap: 14px;
+        align-items: start;
+        padding: 18px 18px 0;
+      }
+
+      .panel-header h2 {
+        font-size: 1.05rem;
+        letter-spacing: 0;
+      }
+
+      .tag {
+        display: inline-flex;
+        align-items: center;
+        min-height: 28px;
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        padding: 0 10px;
+        color: var(--muted);
+        background: var(--surface-alt);
+        font-size: 0.86rem;
+        white-space: nowrap;
+      }
+
+      .media-frame {
+        margin: 16px 18px 18px;
+        overflow: hidden;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: #101514;
+        aspect-ratio: 606 / 320;
+      }
+
+      video,
+      img {
+        display: block;
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+        background: #101514;
+      }
+
+      .metric-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 1px;
+        margin: 18px;
+        overflow: hidden;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: var(--border);
+      }
+
+      .metric {
+        min-width: 0;
+        padding: 12px;
+        background: var(--surface);
+      }
+
+      .metric dt {
+        color: var(--muted);
+        font-size: 0.78rem;
+        font-weight: 700;
+        text-transform: uppercase;
+      }
+
+      .metric dd {
+        margin: 4px 0 0;
+        overflow-wrap: anywhere;
+        font-size: 1.05rem;
+        font-weight: 750;
+      }
+
+      .mode-panel {
+        margin-top: 24px;
+        padding: 18px;
+      }
+
+      .mode-panel h2 {
+        font-size: 1.05rem;
+      }
+
+      .mode-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 1px;
+        margin-top: 14px;
+        overflow: hidden;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: var(--border);
+      }
+
+      .mode {
+        min-width: 0;
+        padding: 14px;
+        background: var(--surface);
+      }
+
+      .mode h3 {
+        font-size: 0.92rem;
+      }
+
+      .mode p {
+        margin-top: 6px;
+        color: var(--muted);
+        font-size: 0.9rem;
+      }
+
+      .compare-section {
+        margin-top: 24px;
+      }
+
+      .compare-header {
+        display: flex;
+        justify-content: space-between;
+        gap: 14px;
+        align-items: end;
+      }
+
+      .compare-header h2 {
+        font-size: 1.25rem;
+      }
+
+      .compare-controls {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 14px;
+        margin-top: 14px;
+      }
+
+      .select-field {
+        min-width: 0;
+      }
+
+      .select-field span {
+        display: block;
+        color: var(--muted);
+        font-size: 0.78rem;
+        font-weight: 700;
+        text-transform: uppercase;
+      }
+
+      .select-field select {
+        width: 100%;
+        min-height: 42px;
+        margin-top: 6px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 0 36px 0 12px;
+        background: var(--surface);
+        color: var(--text);
+        font-weight: 700;
+      }
+
+      .compare-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 18px;
+        margin-top: 18px;
+      }
+
+      .compare-pane {
+        min-width: 0;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: var(--surface);
+        box-shadow: var(--shadow);
+        padding: 16px;
+      }
+
+      .compare-pane h3 {
+        font-size: 1.05rem;
+      }
+
+      .compare-meta {
+        min-height: 2.7em;
+        margin-top: 6px;
+        color: var(--muted);
+        font-size: 0.94rem;
+      }
+
+      .compare-pane .media-frame {
+        margin: 14px 0 0;
+      }
+
+      .compare-placeholder {
+        display: grid;
+        place-items: center;
+        width: 100%;
+        height: 100%;
+        color: #c9d2ce;
+        padding: 18px;
+        text-align: center;
+      }
+
+      .table-wrap {
+        margin-top: 24px;
+        overflow-x: auto;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: var(--surface);
+        box-shadow: var(--shadow);
+      }
+
+      table {
+        width: 100%;
+        min-width: 980px;
+        border-collapse: collapse;
+      }
+
+      th,
+      td {
+        padding: 12px 14px;
+        border-bottom: 1px solid var(--border);
+        text-align: left;
+        vertical-align: top;
+      }
+
+      th {
+        color: var(--muted);
+        background: var(--surface-alt);
+        font-size: 0.78rem;
+        text-transform: uppercase;
+      }
+
+      tbody tr:last-child td {
+        border-bottom: 0;
+      }
+
+      .pending {
+        color: var(--warning);
+      }
+
+      .download-link {
+        color: var(--accent-strong);
+        font-weight: 700;
+      }
+
+      .result-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 18px;
+        margin-top: 24px;
+      }
+
+      .result-card {
+        min-width: 0;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: var(--surface);
+        box-shadow: var(--shadow);
+      }
+
+      .result-card h3 {
+        padding: 16px 16px 0;
+        font-size: 1rem;
+      }
+
+      .result-meta {
+        padding: 6px 16px 0;
+        color: var(--muted);
+        font-size: 0.9rem;
+      }
+
+      .result-card .media-frame {
+        margin: 14px 16px 16px;
+      }
+
+      .empty-preview {
+        display: grid;
+        place-items: center;
+        width: 100%;
+        height: 100%;
+        color: #c9d2ce;
+        padding: 16px;
+        text-align: center;
+      }
+
+      @media (max-width: 840px) {
+        .topbar,
+        .source-grid,
+        .compare-grid,
+        .compare-controls,
+        .status-row {
+          grid-template-columns: 1fr;
+        }
+
+        .actions {
+          justify-content: stretch;
+        }
+
+        .button {
+          flex: 1 1 160px;
+        }
+      }
+
+      @media (max-width: 560px) {
+        .shell {
+          width: min(100% - 20px, 1440px);
+          padding-top: 18px;
+        }
+
+        .metric-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .mode-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .panel-header {
+          display: block;
+        }
+
+        .tag {
+          margin-top: 10px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="shell">
+      <header class="topbar">
+        <div>
+          <h1>Video GIF Benchmark Report</h1>
+          <p class="lede">
+            Basketball MP4 source compared against GIF encodes with different
+            palette, dithering, frame rate, and scale choices.
+          </p>
+        </div>
+        <div class="actions">
+          <button class="button" id="run-button" type="button" disabled>
+            Run benchmark
+          </button>
+          <button class="button secondary" id="reset-button" type="button">
+            Reset
+          </button>
+        </div>
+      </header>
+
+      <div class="status-row" aria-live="polite">
+        <p class="status" id="status">Loading source video...</p>
+        <progress id="progress" max="100" value="0"></progress>
+      </div>
+
+      <section class="source-grid" aria-label="Source video">
+        <article class="panel">
+          <div class="panel-header">
+            <h2>Full Quality Source</h2>
+            <span class="tag">MP4 reference</span>
+          </div>
+          <div class="media-frame">
+            <video id="source-video" controls loop muted playsinline></video>
+          </div>
+        </article>
+
+        <article class="panel">
+          <div class="panel-header">
+            <h2>Source Metrics</h2>
+            <span class="tag" id="source-url">bench fixture</span>
+          </div>
+          <dl class="metric-grid" id="source-metrics"></dl>
+        </article>
+      </section>
+
+      <section class="panel mode-panel" aria-label="Dither modes">
+        <h2>Dither Modes</h2>
+        <div class="mode-grid">
+          <article class="mode">
+            <h3>None</h3>
+            <p>
+              Nearest palette lookup without spatial or temporal error carry.
+            </p>
+          </article>
+          <article class="mode">
+            <h3>Spatial Floyd-Steinberg</h3>
+            <p>Error diffusion inside each frame during palette application.</p>
+          </article>
+          <article class="mode">
+            <h3>Spatial + Temporal</h3>
+            <p>
+              Floyd-Steinberg plus temporal dithering state shared across the
+              animation.
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section class="compare-section" aria-label="Compare outputs">
+        <div class="compare-header">
+          <h2>Compare Outputs</h2>
+        </div>
+        <div class="compare-controls">
+          <label class="select-field" for="compare-left">
+            <span>Left</span>
+            <select id="compare-left"></select>
+          </label>
+          <label class="select-field" for="compare-right">
+            <span>Right</span>
+            <select id="compare-right"></select>
+          </label>
+        </div>
+        <div class="compare-grid">
+          <article class="compare-pane" id="compare-left-pane"></article>
+          <article class="compare-pane" id="compare-right-pane"></article>
+        </div>
+      </section>
+
+      <section class="table-wrap" aria-label="Benchmark file sizes">
+        <table>
+          <thead>
+            <tr>
+              <th>Output</th>
+              <th>Dimensions</th>
+              <th>Frames</th>
+              <th>FPS</th>
+              <th>Palette</th>
+              <th>Dither</th>
+              <th>Size</th>
+              <th>MP4 Ratio</th>
+              <th>Encode Time</th>
+              <th>Download</th>
+            </tr>
+          </thead>
+          <tbody id="results-body"></tbody>
+        </table>
+      </section>
+
+      <section
+        class="result-grid"
+        id="result-grid"
+        aria-label="GIF previews"
+      ></section>
+    </main>
+
+    <script src="./report.js" type="module"></script>
+  </body>
+</html>
