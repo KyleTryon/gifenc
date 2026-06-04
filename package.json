@@ -1,6 +1,6 @@
 {
   "name": "@techsquidtv/gifenc",
-  "version": "1.0.3",
+  "version": "1.1.0",
   "description": "very fast JS GIF encoder",
   "type": "module",
   "packageManager": "pnpm@11.5.1",
