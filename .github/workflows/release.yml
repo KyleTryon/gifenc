@@ -2,25 +2,6 @@ name: Release
 
 on:
   workflow_dispatch:
-    inputs:
-      bump:
-        description: Semver version increment
-        required: true
-        default: patch
-        type: choice
-        options:
-          - patch
-          - minor
-          - major
-          - prepatch
-          - preminor
-          - premajor
-          - prerelease
-      preid:
-        description: Prerelease identifier for prerelease bumps
-        required: false
-        default: beta
-        type: string
 
 permissions:
   contents: write
@@ -51,35 +32,45 @@ jobs:
           registry-url: https://registry.npmjs.org
           package-manager-cache: false
 
+      - name: Determine version bump
+        id: release
+        run: node .github/scripts/determine-release-bump.mjs
+
+      - name: Skip release
+        if: steps.release.outputs.release_needed != 'true'
+        env:
+          RANGE: ${{ steps.release.outputs.range }}
+        run: echo "No release-worthy semver commits found in ${RANGE}."
+
       - name: Enable pnpm
+        if: steps.release.outputs.release_needed == 'true'
         run: corepack enable
 
       - name: Install dependencies
+        if: steps.release.outputs.release_needed == 'true'
         run: pnpm install --frozen-lockfile
 
       - name: Configure release commit author
+        if: steps.release.outputs.release_needed == 'true'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
       - name: Bump package version
         id: version
+        if: steps.release.outputs.release_needed == 'true'
         shell: bash
+        env:
+          BUMP: ${{ steps.release.outputs.bump }}
         run: |
           set -euo pipefail
 
-          bump="${{ inputs.bump }}"
-          preid="${{ inputs.preid }}"
-
-          if [[ "$bump" == pre* || "$bump" == "prerelease" ]]; then
-            npm version "$bump" --preid "${preid:-beta}" --no-git-tag-version
-          else
-            npm version "$bump" --no-git-tag-version
-          fi
+          npm version "$BUMP" --no-git-tag-version
 
           version="$(node -p "JSON.parse(require('node:fs').readFileSync('package.json', 'utf8')).version")"
           tag="v${version}"
 
+          echo "bump=${BUMP}" >> "$GITHUB_OUTPUT"
           echo "version=${version}" >> "$GITHUB_OUTPUT"
           echo "tag=${tag}" >> "$GITHUB_OUTPUT"
 
@@ -92,12 +83,15 @@ jobs:
           fi
 
       - name: Build package
+        if: steps.release.outputs.release_needed == 'true'
         run: pnpm run build
 
       - name: Validate package contents
+        if: steps.release.outputs.release_needed == 'true'
         run: npm pack --dry-run --ignore-scripts --json
 
       - name: Commit and tag release
+        if: steps.release.outputs.release_needed == 'true'
         env:
           TAG: ${{ steps.version.outputs.tag }}
         run: |
@@ -106,6 +100,7 @@ jobs:
           git tag "${TAG}"
 
       - name: Push release commit and tag
+        if: steps.release.outputs.release_needed == 'true'
         env:
           TAG: ${{ steps.version.outputs.tag }}
         run: |
@@ -113,9 +108,11 @@ jobs:
           git push origin "${TAG}"
 
       - name: Publish to npm
+        if: steps.release.outputs.release_needed == 'true'
         run: npm publish --access public --tag "${{ steps.version.outputs.npm_tag }}"
 
       - name: Create GitHub release
+        if: steps.release.outputs.release_needed == 'true'
         uses: actions/github-script@v9
         env:
           TAG: ${{ steps.version.outputs.tag }}
