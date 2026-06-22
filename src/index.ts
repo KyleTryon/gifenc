@@ -2,6 +2,7 @@ export { GIFEncoder, default } from "./encoder.js";
 export { default as quantize } from "./pnn-quant.js";
 export {
   applyPalette,
+  createPaletteMapper,
   nearestColor,
   nearestColorIndex,
   nearestColorIndexWithDistance,
@@ -23,6 +24,7 @@ export type {
   GIFEncoderOptions,
   Int32Buffer,
   Palette,
+  PaletteMapper,
   PrequantizeOptions,
   QuantizeOptions,
   RGBA,

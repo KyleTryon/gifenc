@@ -280,6 +280,25 @@ export type ApplyPaletteOptions = {
 };
 
 /**
+ * Reusable palette mapper for converting multiple RGBA frames with the same
+ * palette and format.
+ */
+export type PaletteMapper = {
+  /**
+   * Palette lookup format used by this mapper.
+   */
+  readonly format: Format;
+  /**
+   * Convert one RGBA frame to palette indexes.
+   */
+  map: (rgba: RGBAInput) => ByteArray;
+  /**
+   * Clear cached nearest-color lookups while keeping the palette data.
+   */
+  reset: () => void;
+};
+
+/**
  * Options for {@link GIFEncoder}.
  */
 export type GIFEncoderOptions = {
