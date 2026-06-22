@@ -1,47 +1,30 @@
 import * as path from "node:path";
 import { readFile } from "node:fs/promises";
+import { stat } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import * as pngjs from "pngjs";
 import { GIFEncoder, applyPalette, quantize } from "../../dist/gifenc.mjs";
+import {
+  BENCH_FORMATS,
+  BENCH_IMAGE_FIXTURES,
+  BENCH_VIDEO_FIXTURES,
+} from "../fixtures/index.js";
 
 const { PNG } = pngjs;
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-
-const FORMATS = ["rgb444", "rgb565", "rgba4444"];
-const CASES = [
-  {
-    name: "high-color",
-    file: "../../test/fixtures/baboon.png",
-    quantizeIterations: 8,
-    applyIterations: 25,
-    encodeIterations: 50,
-  },
-  {
-    name: "low-color",
-    file: "../../test/fixtures/007.png",
-    quantizeIterations: 25,
-    applyIterations: 50,
-    encodeIterations: 100,
-  },
-  {
-    name: "transparent",
-    file: "../../test/fixtures/007-transparent.png",
-    quantizeIterations: 25,
-    applyIterations: 50,
-    encodeIterations: 100,
-  },
-];
+const repoRoot = path.resolve(__dirname, "../..");
 
 const overrideIterations = readPositiveIntEnv("GIFENC_BENCH_ITERATIONS");
 
-for (const benchCase of CASES) {
+await printVideoFixture(BENCH_VIDEO_FIXTURES.basketball);
+for (const benchCase of BENCH_IMAGE_FIXTURES) {
   await runCase(benchCase);
 }
 
 async function runCase(benchCase) {
-  const image = await readImage(path.resolve(__dirname, benchCase.file));
+  const image = await readImage(resolveRepoPath(benchCase.repoPath));
   console.log(
-    `\n${benchCase.name} ${path.basename(benchCase.file)} ${image.width}x${
+    `\n${benchCase.id} ${path.basename(benchCase.repoPath)} ${image.width}x${
       image.height
     }`,
   );
@@ -49,7 +32,7 @@ async function runCase(benchCase) {
     "format,stage,iterations,mean_ms,median_ms,min_ms,max_ms,output_bytes",
   );
 
-  for (const format of FORMATS) {
+  for (const format of BENCH_FORMATS) {
     const quantizeIterations =
       overrideIterations ?? benchCase.quantizeIterations;
     const applyIterations = overrideIterations ?? benchCase.applyIterations;
@@ -79,6 +62,17 @@ async function runCase(benchCase) {
     });
     printResult(format, "encode", encoded, encoded.value.byteLength);
   }
+}
+
+async function printVideoFixture(fixture) {
+  const info = await stat(resolveRepoPath(fixture.repoPath));
+  console.log(
+    `${fixture.id} ${path.basename(fixture.repoPath)} ${fixture.fps}fps ${info.size} bytes`,
+  );
+}
+
+function resolveRepoPath(repoPath) {
+  return path.resolve(repoRoot, repoPath);
 }
 
 function measure(iterations, fn) {

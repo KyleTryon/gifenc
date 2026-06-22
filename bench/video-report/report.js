@@ -4,9 +4,11 @@ import {
   createTemporalDither,
   quantize,
 } from "../../dist/gifenc.mjs";
+import { BENCH_VIDEO_FIXTURES, fixtureUrl } from "../fixtures/index.js";
 
-const SOURCE_URL = "../fixtures/basketball_5s_320p.mp4";
-const SOURCE_FPS = 24;
+const SOURCE_VIDEO = BENCH_VIDEO_FIXTURES.basketball;
+const SOURCE_URL = fixtureUrl(SOURCE_VIDEO);
+const SOURCE_FPS = SOURCE_VIDEO.fps;
 const BLANK_GIF_URL =
   "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==";
 const SKY_ROI = {
