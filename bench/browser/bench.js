@@ -1,4 +1,5 @@
 import { GIFEncoder, applyPalette, quantize } from "../../dist/gifenc.mjs";
+import { BENCH_IMAGE_FIXTURES, fixtureUrl } from "../../fixtures/index.js";
 
 const N = 100;
 
@@ -22,9 +23,12 @@ async function loadImage(url) {
 }
 
 (async () => {
-  const { data, width, height } = await readImage(
-    "/test/fixtures/007-transparent.png",
-  );
+  const fixture =
+    BENCH_IMAGE_FIXTURES.find((candidate) => candidate.id === "transparent") ??
+    BENCH_IMAGE_FIXTURES[0];
+  if (!fixture)
+    throw new Error("Expected at least one benchmark image fixture");
+  const { data, width, height } = await readImage(fixtureUrl(fixture));
 
   const format = "rgb444";
 

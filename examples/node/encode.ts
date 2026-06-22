@@ -23,7 +23,7 @@ type SourceImage = {
 async function encode(): Promise<void> {
   // Load width/height + RGBA uint8 array data
   const { data, width, height } = await readImage(
-    path.resolve(__dirname, "../../test/fixtures/baboon.png"),
+    path.resolve(__dirname, "../../fixtures/images/baboon.png"),
   );
 
   // Choose a pixel format: rgba4444, rgb444, rgb565
