@@ -34,7 +34,7 @@ export function GIFEncoder(opt: GIFEncoderOptions = {}): GIFEncoderInstance {
   const stream = createStream(initialCapacity);
 
   // Shared array data across all frames
-  const HSIZE = 5003; // 80% occupancy
+  const HSIZE = 32749; // larger prime table lowers LZW probe pressure
   const accum = new Uint8Array(256);
   const htab = new Int32Array(HSIZE);
   const codetab = new Int32Array(HSIZE);
