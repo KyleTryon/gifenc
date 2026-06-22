@@ -169,7 +169,6 @@ export function createPaletteMapper(
   }
 }
 
-
 function nearestColorIndexRGBChannels(
   r: number,
   g: number,
