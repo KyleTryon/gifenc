@@ -8,7 +8,7 @@ import {
   BENCH_FORMATS,
   BENCH_IMAGE_FIXTURES,
   BENCH_VIDEO_FIXTURES,
-} from "../fixtures/index.js";
+} from "../../fixtures/index.js";
 
 const { PNG } = pngjs;
 const __dirname = path.dirname(fileURLToPath(import.meta.url));

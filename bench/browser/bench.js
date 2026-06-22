@@ -1,5 +1,5 @@
 import { GIFEncoder, applyPalette, quantize } from "../../dist/gifenc.mjs";
-import { BENCH_IMAGE_FIXTURES, fixtureUrl } from "../fixtures/index.js";
+import { BENCH_IMAGE_FIXTURES, fixtureUrl } from "../../fixtures/index.js";
 
 const N = 100;
 

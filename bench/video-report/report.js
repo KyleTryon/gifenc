@@ -4,7 +4,7 @@ import {
   createTemporalDither,
   quantize,
 } from "../../dist/gifenc.mjs";
-import { BENCH_VIDEO_FIXTURES, fixtureUrl } from "../fixtures/index.js";
+import { BENCH_VIDEO_FIXTURES, fixtureUrl } from "../../fixtures/index.js";
 
 const SOURCE_VIDEO = BENCH_VIDEO_FIXTURES.basketball;
 const SOURCE_URL = fixtureUrl(SOURCE_VIDEO);

@@ -23,7 +23,7 @@ type SourceImage = {
 
 async function encode(): Promise<void> {
   const { data, width, height } = await readImage(
-    path.resolve(__dirname, "../../test/fixtures/baboon.png"),
+    path.resolve(__dirname, "../../fixtures/images/baboon.png"),
   );
 
   const format: Format = "rgb565";
