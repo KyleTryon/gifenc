@@ -6,7 +6,6 @@ import {
 import { assertRgbaInput, createUint32PixelView } from "../rgba.js";
 import { assertPalette, assertPaletteMatchesFormat } from "../validation.js";
 import { applyPaletteDither } from "./dither.js";
-import { nearestColorIndexRGB, nearestColorIndexRGBA } from "./nearest.js";
 import { normalizeApplyPaletteOptions } from "./options.js";
 import { uint32At } from "./utils.js";
 import type {
@@ -48,9 +47,25 @@ export function applyPalette(
   const length = data.length;
   const bincount = format === "rgb444" ? 4096 : 65536;
   const index = new Uint8Array(length);
-  const cache: Array<number | undefined> = new Array<number | undefined>(
-    bincount,
-  );
+  const cache = new Int16Array(bincount);
+  cache.fill(-1);
+  const paletteLength = palette.length;
+  const paletteR = new Uint8Array(paletteLength);
+  const paletteG = new Uint8Array(paletteLength);
+  const paletteB = new Uint8Array(paletteLength);
+  const paletteA = new Uint8Array(paletteLength);
+  for (let i = 0; i < paletteLength; i++) {
+    const color = palette[i];
+    if (!color) {
+      throw new Error(
+        `applyPalette() expected palette color at index ${String(i)}`,
+      );
+    }
+    paletteR[i] = color[0];
+    paletteG[i] = color[1];
+    paletteB[i] = color[2];
+    paletteA[i] = color[3] ?? 0xff;
+  }
 
   // Some duplicate code below due to very hot code path.
   // Introducing branching/conditions shows significant impact.
@@ -62,9 +77,20 @@ export function applyPalette(
       const g = (color >> 8) & 0xff;
       const r = color & 0xff;
       const key = rgba8888_to_rgba4444(r, g, b, a);
-      let idx = cache[key];
-      if (idx == null) {
-        idx = cache[key] = nearestColorIndexRGBA(r, g, b, a, palette);
+      let idx = cache[key] ?? -1;
+      if (idx < 0) {
+        idx = nearestColorIndexRGBAChannels(
+          r,
+          g,
+          b,
+          a,
+          paletteR,
+          paletteG,
+          paletteB,
+          paletteA,
+          paletteLength,
+        );
+        cache[key] = idx;
       }
       index[i] = idx;
     }
@@ -77,13 +103,81 @@ export function applyPalette(
       const g = (color >> 8) & 0xff;
       const r = color & 0xff;
       const key = rgb888_to_key(r, g, b);
-      let idx = cache[key];
-      if (idx == null) {
-        idx = cache[key] = nearestColorIndexRGB(r, g, b, palette);
+      let idx = cache[key] ?? -1;
+      if (idx < 0) {
+        idx = nearestColorIndexRGBChannels(
+          r,
+          g,
+          b,
+          paletteR,
+          paletteG,
+          paletteB,
+          paletteLength,
+        );
+        cache[key] = idx;
       }
       index[i] = idx;
     }
   }
 
   return index;
+}
+
+function nearestColorIndexRGBChannels(
+  r: number,
+  g: number,
+  b: number,
+  paletteR: Uint8Array,
+  paletteG: Uint8Array,
+  paletteB: Uint8Array,
+  paletteLength: number,
+): number {
+  let k = 0;
+  let mindist = 1e100;
+  for (let i = 0; i < paletteLength; i++) {
+    const dr = (paletteR[i] ?? 0) - r;
+    let curdist = dr * dr;
+    if (curdist > mindist) continue;
+    const dg = (paletteG[i] ?? 0) - g;
+    curdist += dg * dg;
+    if (curdist > mindist) continue;
+    const db = (paletteB[i] ?? 0) - b;
+    curdist += db * db;
+    if (curdist > mindist) continue;
+    mindist = curdist;
+    k = i;
+  }
+  return k;
+}
+
+function nearestColorIndexRGBAChannels(
+  r: number,
+  g: number,
+  b: number,
+  a: number,
+  paletteR: Uint8Array,
+  paletteG: Uint8Array,
+  paletteB: Uint8Array,
+  paletteA: Uint8Array,
+  paletteLength: number,
+): number {
+  let k = 0;
+  let mindist = 1e100;
+  for (let i = 0; i < paletteLength; i++) {
+    const da = (paletteA[i] ?? 0xff) - a;
+    let curdist = da * da;
+    if (curdist > mindist) continue;
+    const dr = (paletteR[i] ?? 0) - r;
+    curdist += dr * dr;
+    if (curdist > mindist) continue;
+    const dg = (paletteG[i] ?? 0) - g;
+    curdist += dg * dg;
+    if (curdist > mindist) continue;
+    const db = (paletteB[i] ?? 0) - b;
+    curdist += db * db;
+    if (curdist > mindist) continue;
+    mindist = curdist;
+    k = i;
+  }
+  return k;
 }
