@@ -9,6 +9,13 @@ import { alpha, blue, byteAt, green, red } from "./utils.js";
 import type { Palette, RGBAInput } from "../types.js";
 import type { NormalizedApplyPaletteOptions } from "./options.js";
 
+// Scratch buffers reused across applyPalette() calls to avoid re-allocating
+// multiple float arrays per animation frame. Both buffers are fully
+// overwritten by the initialization loop below before any reads, so stale
+// data from a previous frame can never leak into the output.
+let sharedDiffusionPixels: Float32Array | null = null;
+let sharedTemporalPixels: Float32Array | null = null;
+
 export function applyPaletteDither(
   rgba: RGBAInput,
   palette: Palette,
@@ -54,9 +61,15 @@ export function applyPaletteDither(
         "applyPalette",
       )
     : null;
-  const pixels = new Float32Array(length * channels);
+  const pixelChannelLength = length * channels;
+  const pixels =
+    sharedDiffusionPixels?.length === pixelChannelLength
+      ? sharedDiffusionPixels
+      : (sharedDiffusionPixels = new Float32Array(pixelChannelLength));
   const temporalPixels = temporalErrors
-    ? new Float32Array(length * channels)
+    ? sharedTemporalPixels?.length === pixelChannelLength
+      ? sharedTemporalPixels
+      : (sharedTemporalPixels = new Float32Array(pixelChannelLength))
     : null;
   const index = new Uint8Array(length);
   const temporalStrength = temporalDither?.strength ?? 0;
