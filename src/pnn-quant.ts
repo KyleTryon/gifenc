@@ -13,6 +13,7 @@ import {
 } from "./rgb-packing.js";
 import { assertRgbaInput, createUint32PixelView } from "./rgba.js";
 import { assertMaxColors, normalizeFormat } from "./validation.js";
+import { sqr, uint32At } from "./palette/utils.js";
 
 import type {
   Color,
@@ -40,18 +41,6 @@ type BinList = Array<Bin | undefined>;
 
 function clamp(value: number, min: number, max: number): number {
   return value < min ? min : value > max ? max : value;
-}
-
-function sqr(value: number): number {
-  return value * value;
-}
-
-function uint32At(data: Uint32Array, index: number): number {
-  const value = data[index];
-  if (value == null) {
-    throw new Error(`Expected uint32 pixel at index ${String(index)}`);
-  }
-  return value;
 }
 
 function binAt(bins: BinList, index: number): Bin {

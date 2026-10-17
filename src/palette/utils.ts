@@ -58,19 +58,6 @@ export function cloneColor(color: readonly number[]): Color {
     : toRGB(color);
 }
 
-export function describeValue(value: unknown): string {
-  if (
-    value == null ||
-    typeof value === "string" ||
-    typeof value === "number" ||
-    typeof value === "boolean"
-  ) {
-    return String(value);
-  }
-
-  return Object.prototype.toString.call(value);
-}
-
 export function sqr(value: number): number {
   return value * value;
 }
