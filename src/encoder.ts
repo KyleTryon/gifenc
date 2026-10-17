@@ -2,6 +2,13 @@ import constants from "./constants.js";
 import lzwEncode from "./lzw-encode.js";
 import createStream from "./stream.js";
 import { assertPalette } from "./validation.js";
+import {
+  assertColorDepth,
+  assertDelay,
+  assertDispose,
+  assertRepeat,
+  assertTransparentIndex,
+} from "./validation.js";
 import type {
   ByteStream,
   ByteArray,
@@ -80,11 +87,6 @@ export function GIFEncoder(opt: GIFEncoderOptions = {}): GIFEncoderInstance {
         if (!hasInit) {
           // have not yet init, we can consider this our first frame
           first = true;
-          // in 'auto' mode, we also encode a header on first frame
-          // this is different than manual mode where you must encode
-          // header yoursef (or perhaps not write header altogether)
-          writeHeader();
-          hasInit = true;
         }
       } else {
         // in manual mode, the first frame is determined by the options only
@@ -100,6 +102,18 @@ export function GIFEncoder(opt: GIFEncoderOptions = {}): GIFEncoderInstance {
         throw new Error(
           "GIFEncoder.writeFrame() expected index length to match width * height",
         );
+      }
+      assertColorDepth(colorDepth, "GIFEncoder.writeFrame");
+      assertTransparentIndex(transparentIndex, "GIFEncoder.writeFrame");
+      assertDelay(delay, "GIFEncoder.writeFrame");
+      assertRepeat(repeat, "GIFEncoder.writeFrame");
+      assertDispose(dispose, "GIFEncoder.writeFrame");
+
+      if (first && auto) {
+        // Validate everything before writing so a failing call leaves the
+        // stream untouched and the encoder still usable.
+        writeHeader();
+        hasInit = true;
       }
 
       // Write pre-frame details such as repeat count and global palette
