@@ -124,9 +124,14 @@ export function assertTransparentIndex(
 }
 
 export function assertDelay(delay: unknown, functionName: string): void {
-  if (typeof delay !== "number" || !Number.isFinite(delay) || delay < 0) {
+  if (
+    typeof delay !== "number" ||
+    !Number.isFinite(delay) ||
+    delay < 0 ||
+    Math.round(delay / 10) > 0xffff
+  ) {
     throw new Error(
-      `${functionName}() expected delay to be a non-negative number of milliseconds`,
+      `${functionName}() expected delay to be a non-negative number of milliseconds up to 655350`,
     );
   }
 }

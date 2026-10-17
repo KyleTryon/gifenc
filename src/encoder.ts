@@ -109,27 +109,35 @@ export function GIFEncoder(opt: GIFEncoderOptions = {}): GIFEncoderInstance {
       assertRepeat(repeat, "GIFEncoder.writeFrame");
       assertDispose(dispose, "GIFEncoder.writeFrame");
 
+      const globalPalette = first ? palette : null;
+      const localPalette = !first ? palette : null;
+      if (first && !globalPalette) {
+        throw new Error("First frame must include a { palette } option");
+      }
+      if (globalPalette) {
+        assertPalette(globalPalette, "GIFEncoder.writeFrame");
+      }
+      if (localPalette) {
+        assertPalette(localPalette, "GIFEncoder.writeFrame");
+      }
+
+      // All validation is done; from here on every write is unconditional so
+      // a failing call leaves the stream untouched and the encoder usable.
       if (first && auto) {
-        // Validate everything before writing so a failing call leaves the
-        // stream untouched and the encoder still usable.
         writeHeader();
         hasInit = true;
       }
 
       // Write pre-frame details such as repeat count and global palette
-      if (first) {
-        if (!palette) {
-          throw new Error("First frame must include a { palette } option");
-        }
-        assertPalette(palette, "GIFEncoder.writeFrame");
+      if (first && globalPalette) {
         encodeLogicalScreenDescriptor(
           stream,
           width,
           height,
-          palette,
+          globalPalette,
           colorDepth,
         );
-        encodeColorTable(stream, palette);
+        encodeColorTable(stream, globalPalette);
         if (repeat >= 0) {
           encodeNetscapeExt(stream, repeat);
         }
@@ -144,10 +152,6 @@ export function GIFEncoder(opt: GIFEncoderOptions = {}): GIFEncoderInstance {
         transparentIndex,
       );
 
-      const localPalette = palette && !first ? palette : null;
-      if (localPalette) {
-        assertPalette(localPalette, "GIFEncoder.writeFrame");
-      }
       encodeImageDescriptor(stream, width, height, localPalette);
       if (localPalette) encodeColorTable(stream, localPalette);
       encodePixels(

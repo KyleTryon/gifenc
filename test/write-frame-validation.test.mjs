@@ -82,6 +82,58 @@ test("writeFrame validates delay", () => {
   }
 });
 
+test("writeFrame rejects delays that overflow the 16-bit GIF field", () => {
+  for (const delay of [655360, 1e9]) {
+    const gif = createEncoder();
+    assert.throws(
+      () => gif.writeFrame(index, 2, 2, { palette, delay }),
+      /delay/,
+    );
+  }
+});
+
+test("an invalid first palette leaves the stream empty and retryable", () => {
+  const gif = createEncoder();
+  assert.throws(
+    () => gif.writeFrame(index, 2, 2, { palette: null }),
+    /\{ palette \}/,
+  );
+  assert.equal(gif.bytesView().length, 0);
+
+  const badPalette = [[256, 0, 0]];
+  assert.throws(
+    () => gif.writeFrame(index, 2, 2, { palette: badPalette }),
+    /palette/,
+  );
+  assert.equal(gif.bytesView().length, 0);
+
+  // The encoder must still emit a complete GIF with header, screen
+  // descriptor, and global color table on the next attempt.
+  gif.writeFrame(index, 2, 2, { palette });
+  gif.finish();
+  const bytes = gif.bytesView();
+  assert.equal(String.fromCharCode(...bytes.subarray(0, 6)), "GIF89a");
+  // logical screen descriptor follows the 6-byte header
+  assert.equal(bytes[6], 2); // width low byte
+  assert.equal(bytes[10] & 0x80, 0x80); // global color table flag
+});
+
+test("an invalid later local palette appends nothing to the stream", () => {
+  const gif = createEncoder();
+  gif.writeFrame(index, 2, 2, { palette });
+  const lengthAfterFirstFrame = gif.bytesView().length;
+
+  const badPalette = [[0, 0, -1]];
+  assert.throws(
+    () => gif.writeFrame(index, 2, 2, { palette: badPalette }),
+    /palette/,
+  );
+  assert.equal(gif.bytesView().length, lengthAfterFirstFrame);
+
+  gif.writeFrame(index, 2, 2, { palette });
+  gif.finish();
+});
+
 test("writeFrame validates repeat", () => {
   for (const repeat of [-2, 65536, 1.5, null]) {
     const gif = createEncoder();

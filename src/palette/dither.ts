@@ -12,9 +12,27 @@ import type { NormalizedApplyPaletteOptions } from "./options.js";
 // Scratch buffers reused across applyPalette() calls to avoid re-allocating
 // multiple float arrays per animation frame. Both buffers are fully
 // overwritten by the initialization loop below before any reads, so stale
-// data from a previous frame can never leak into the output.
-let sharedDiffusionPixels: Float32Array | null = null;
-let sharedTemporalPixels: Float32Array | null = null;
+// data from a previous frame can never leak into the output. Buffers larger
+// than MAX_RETAINED_SCRATCH_BYTES are never cached, so a single huge frame
+// cannot pin memory for the module's lifetime.
+const MAX_RETAINED_SCRATCH_BYTES = 64 * 1024 * 1024;
+
+type ScratchPool = { buffer: Float32Array | null };
+
+const diffusionPool: ScratchPool = { buffer: null };
+const temporalPool: ScratchPool = { buffer: null };
+
+function acquireScratch(pool: ScratchPool, elements: number): Float32Array {
+  const { buffer } = pool;
+  if (buffer?.length === elements) return buffer;
+  const next = new Float32Array(elements);
+  pool.buffer = next.byteLength <= MAX_RETAINED_SCRATCH_BYTES ? next : null;
+  return next;
+}
+
+function releaseScratch(pool: ScratchPool): void {
+  pool.buffer = null;
+}
 
 export function applyPaletteDither(
   rgba: RGBAInput,
@@ -62,15 +80,15 @@ export function applyPaletteDither(
       )
     : null;
   const pixelChannelLength = length * channels;
-  const pixels =
-    sharedDiffusionPixels?.length === pixelChannelLength
-      ? sharedDiffusionPixels
-      : (sharedDiffusionPixels = new Float32Array(pixelChannelLength));
-  const temporalPixels = temporalErrors
-    ? sharedTemporalPixels?.length === pixelChannelLength
-      ? sharedTemporalPixels
-      : (sharedTemporalPixels = new Float32Array(pixelChannelLength))
-    : null;
+  const pixels = acquireScratch(diffusionPool, pixelChannelLength);
+  let temporalPixels: Float32Array | null = null;
+  if (temporalErrors) {
+    temporalPixels = acquireScratch(temporalPool, pixelChannelLength);
+  } else {
+    // Release the temporal buffer once temporal dithering stops so idle
+    // modules do not keep pinning memory.
+    releaseScratch(temporalPool);
+  }
   const index = new Uint8Array(length);
   const temporalStrength = temporalDither?.strength ?? 0;
 
