@@ -267,7 +267,7 @@ export type ApplyPaletteOptions = {
   /**
    * Reverse every other dither row to reduce directional artifacts.
    *
-   * Defaults to `false`.
+   * Defaults to `true`.
    */
   serpentine?: boolean;
   /**
