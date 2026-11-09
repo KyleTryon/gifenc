@@ -1,7 +1,7 @@
 import type { Color, Palette, RGBAInput } from "../types.js";
 
 export function roundStep(byte: number, step: number): number {
-  return step > 1 ? Math.round(byte / step) * step : byte;
+  return step > 1 ? Math.min(255, Math.round(byte / step) * step) : byte;
 }
 
 export function uint32At(data: Uint32Array, index: number): number {
