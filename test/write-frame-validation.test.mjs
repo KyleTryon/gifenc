@@ -162,8 +162,68 @@ test("writeFrame accepts documented option ranges", () => {
     dispose: 7,
     delay: 0,
     transparent: true,
-    transparentIndex: 255,
+    transparentIndex: palette.length - 1,
   });
   gif.finish();
   assert.ok(gif.bytesView().length > 0);
+});
+
+test("dimensions must be integer GIF fields and failed writes are atomic", () => {
+  const gif = createEncoder();
+  for (const dimension of [0, -1, 1.5, 65536, NaN, Infinity, "2"]) {
+    for (const [width, height] of [
+      [dimension, 2],
+      [2, dimension],
+    ]) {
+      assert.throws(
+        () => gif.writeFrame(index, width, height, { palette }),
+        /dimensions/,
+      );
+      assert.equal(gif.bytesView().length, 0);
+    }
+  }
+  gif.writeFrame(index, 2, 2, { palette });
+  const before = gif.bytes();
+  assert.throws(
+    () => gif.writeFrame(new Uint8Array(6), 3, 2),
+    /logical screen/,
+  );
+  assert.deepEqual(gif.bytes(), before);
+});
+
+test("indexes and transparency must reference the active color table", () => {
+  const gif = createEncoder();
+  for (const options of [
+    { palette, colorDepth: 1 },
+    { palette: [[0, 0, 0]] },
+    { palette, transparent: true, transparentIndex: palette.length },
+  ]) {
+    assert.throws(
+      () => gif.writeFrame(index, 2, 2, options),
+      /colorDepth|active palette/,
+    );
+    assert.equal(gif.bytesView().length, 0);
+  }
+  assert.throws(() => gif.writeFrame([0], 1, 1, { palette }), /Uint8Array/);
+  gif.writeFrame(index, 2, 2, { palette });
+  const before = gif.bytes();
+  assert.throws(
+    () => gif.writeFrame(new Uint8Array([palette.length]), 1, 1),
+    /active palette/,
+  );
+  assert.throws(
+    () => gif.writeFrame(index, 2, 2, { palette: [[0, 0, 0]] }),
+    /active palette/,
+  );
+  assert.deepEqual(gif.bytes(), before);
+  gif.reset();
+  assert.throws(() => gif.writeFrame(index, 2, 2), /palette/);
+  assert.equal(gif.bytesView().length, 0);
+});
+
+test("manual chunks must supply a local palette or initialize a global table", () => {
+  const gif = GIFEncoder({ auto: false });
+  assert.throws(() => gif.writeFrame(index, 2, 2), /palette/);
+  assert.equal(gif.bytesView().length, 0);
+  gif.writeFrame(index, 2, 2, { palette });
 });

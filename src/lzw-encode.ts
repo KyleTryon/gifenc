@@ -41,8 +41,6 @@ function tableCode(table: Int32Buffer, index: number): number {
 }
 
 function lzwEncode(
-  width: number,
-  height: number,
   pixels: ByteArray,
   colorDepth: number,
   outStream: ByteStream = createStream(512),
@@ -50,9 +48,6 @@ function lzwEncode(
   htab: Int32Buffer = new Int32Array(DEFAULT_HSIZE),
   codetab: Int32Buffer = new Int32Array(DEFAULT_HSIZE),
 ): ByteArray {
-  void width;
-  void height;
-
   if (pixels.length === 0) {
     throw new Error("lzwEncode() expected non-empty pixel data");
   }
