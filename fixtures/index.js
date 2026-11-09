@@ -37,5 +37,6 @@ export const BENCH_VIDEO_FIXTURES = {
 };
 
 export function fixtureUrl(fixture) {
-  return `/${fixture.repoPath}`;
+  return new URL(fixture.repoPath.replace(/^fixtures\//, ""), import.meta.url)
+    .href;
 }
