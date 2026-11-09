@@ -44,15 +44,16 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
-    "@types/node": "^24.12.4",
+    "@types/node": "^24.19.2",
     "@types/pngjs": "^6.0.5",
-    "esbuild": "^0.28.0",
-    "eslint": "^10.4.1",
-    "knip": "^6.15.0",
+    "esbuild": "^0.28.2",
+    "eslint": "^10.14.0",
+    "knip": "^6.44.2",
+    "omggif": "^1.0.10",
     "pngjs": "^7.0.0",
-    "prettier": "^3.8.3",
+    "prettier": "^3.9.10",
     "typescript": "^6.0.3",
-    "typescript-eslint": "^8.60.1"
+    "typescript-eslint": "^8.72.1"
   },
   "scripts": {
     "prepare": "pnpm run build",
