@@ -78,7 +78,8 @@
     "build:types": "tsc -p tsconfig.types.json",
     "serve": "node scripts/serve.mjs",
     "dist:cjs": "pnpm run build:cjs",
-    "knip": "knip"
+    "knip": "knip",
+    "bench:animation": "pnpm run build:esm && node bench/node/animation.mjs"
   },
   "keywords": [
     "gif",

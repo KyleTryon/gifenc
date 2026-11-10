@@ -58,7 +58,7 @@ for (const fixture of BENCH_IMAGE_FIXTURES) {
         ? ["quantize"]
         : stage === "mapping"
           ? ["applyPalette", "reusedMapper"]
-          : ["applyPalette", "encode", "tinyEncode"];
+          : ["quantize", "applyPalette", "dither", "encode", "tinyEncode"];
     const mapper = candidate.createPaletteMapper?.(palette, format);
     if (mapper) {
       assert.deepEqual(
@@ -80,6 +80,10 @@ for (const fixture of BENCH_IMAGE_FIXTURES) {
       applyPalette: [
         () => baseline.applyPalette(image.data, palette, format),
         () => candidate.applyPalette(image.data, palette, format),
+      ],
+      dither: [
+        () => baseline.applyPalette(image.data, palette, options),
+        () => candidate.applyPalette(image.data, palette, options),
       ],
       reusedMapper: [
         () => baseline.applyPalette(image.data, palette, format),
