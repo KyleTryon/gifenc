@@ -1,4 +1,4 @@
-import { GIFEncoder, quantize, applyPalette } from "/dist/gifenc.mjs";
+import { encodeFrameChunk, quantize, applyPalette } from "/dist/gifenc.mjs";
 
 let options;
 
@@ -13,26 +13,23 @@ self.addEventListener("message", (ev) => {
     // Get the options for the encoder
     const { format = "rgb444", width, height, maxColors = 256 } = options;
 
-    // Get the data + index for this frame
-    const [data, frame, delay] = detail;
+    const [data, frame, globalPalette, delay] = detail;
 
     // Get palette from this frame
-    const palette = quantize(data, maxColors, { format });
+    const palette =
+      frame === 0 ? globalPalette : quantize(data, maxColors, { format });
 
     // Now get an indexed bitmap image
     const index = applyPalette(data, palette, format);
 
     // Encode into a single GIF frame chunk
-    const gif = GIFEncoder({ auto: false });
-    gif.writeFrame(index, width, height, {
-      first: frame === 0,
-      repeat: 0,
+    const chunk = encodeFrameChunk(index, width, height, {
+      sequenceIndex: frame,
+      globalPalette,
+      ...(frame === 0 ? {} : { palette }),
       delay,
-      palette,
     });
 
-    // Send the result back ot main thread
-    const output = gif.bytesView();
-    self.postMessage([output, frame], [output.buffer]);
+    self.postMessage([chunk, frame], [chunk.bytes.buffer]);
   }
 });

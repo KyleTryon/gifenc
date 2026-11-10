@@ -81,6 +81,8 @@ try {
       };
       const opts = {
         totalFrames: 3,
+        fps: 12,
+        duration: 0.2,
         width: 2,
         height: 2,
         workerCount: 2,
@@ -278,6 +280,9 @@ try {
   const reader = new GifReader(Uint8Array.from(result.bytes));
   if (reader.numFrames() !== 3) throw new Error("Wrong frame count");
   for (let frame = 0; frame < 3; frame++) {
+    const expectedDelays = [8, 9, 3];
+    if (reader.frameInfo(frame).delay !== expectedDelays[frame])
+      throw new Error(`Wrong decoded delay for frame ${frame}`);
     const pixels = new Uint8Array(16);
     reader.decodeAndBlitFrameRGBA(frame, pixels);
     const expected = [

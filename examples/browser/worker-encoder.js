@@ -1,4 +1,4 @@
-import { GIFEncoder } from "/dist/gifenc.mjs";
+import { assembleFrameChunks, frameDelay, quantize } from "/dist/gifenc.mjs";
 
 // A single producer awaits ready() before allocating its next frame.
 // Capacity is not reserved for concurrent producers.
@@ -8,6 +8,7 @@ export async function createWorkerEncoder({
   width,
   height,
   fps = 30,
+  duration = totalFrames / fps,
   maxColors = 256,
   format = "rgb444",
   progress = () => {},
@@ -25,7 +26,8 @@ export async function createWorkerEncoder({
     completed = 0,
     failure,
     closed = false,
-    waiter;
+    waiter,
+    globalPalette;
   const cleanup = () => {
     if (closed) return;
     closed = true;
@@ -83,7 +85,9 @@ export async function createWorkerEncoder({
             slot.frame === null ||
             !Array.isArray(data) ||
             data[1] !== slot.frame ||
-            !(data[0] instanceof Uint8Array)
+            !data[0] ||
+            data[0].sequenceIndex !== slot.frame ||
+            !(data[0].bytes instanceof Uint8Array)
           )
             return fail(new Error("Unexpected worker response"));
           chunks[slot.frame] = data[0];
@@ -103,7 +107,6 @@ export async function createWorkerEncoder({
         height,
         maxColors,
         format,
-        delay: 1000 / fps,
       });
     }
     while (!workers.every((slot) => slot.ready)) {
@@ -132,7 +135,15 @@ export async function createWorkerEncoder({
       slot.frame = frame;
       admitted++;
       try {
-        slot.worker.postMessage([data, frame], [data.buffer]);
+        if (frame === 0) globalPalette = quantize(data, maxColors, { format });
+        const delay = frameDelay(
+          (frame * 1000) / fps,
+          Math.min(((frame + 1) * 1000) / fps, duration * 1000),
+        );
+        slot.worker.postMessage(
+          [data, frame, globalPalette, delay],
+          [data.buffer],
+        );
       } catch (error) {
         fail(error);
         throw error;
@@ -147,11 +158,7 @@ export async function createWorkerEncoder({
         check();
       }
       try {
-        const gif = GIFEncoder({ auto: false });
-        gif.writeHeader();
-        for (const chunk of chunks) gif.stream.writeBytesView(chunk);
-        gif.finish();
-        return gif.bytesView();
+        return assembleFrameChunks(chunks, totalFrames);
       } finally {
         cleanup();
       }
