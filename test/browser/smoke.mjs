@@ -31,6 +31,21 @@ try {
       const assert = (condition, message) => {
         if (!condition) throw new Error(message);
       };
+      const libraryUrl = location.origin + "/dist/gifenc.mjs";
+      const { GIFEncoder, quantize, applyPalette } = await import(libraryUrl);
+      const rgba = new Uint8Array([0, 255, 0, 255]);
+      const palette = quantize(rgba, 256);
+      const direct = GIFEncoder();
+      direct.writeFrame(applyPalette(rgba, palette), 1, 1, { palette });
+      direct.finish();
+      const directBitmap = await createImageBitmap(
+        new Blob([direct.bytesView()], { type: "image/gif" }),
+      );
+      assert(
+        directBitmap.width === 1 && directBitmap.height === 1,
+        "direct GIF did not decode",
+      );
+      directBitmap.close();
       const encoder = await createWorkerEncoder({
         totalFrames: 1,
         width: 1,
