@@ -34,7 +34,6 @@ function makeChunks() {
     encodeFrameChunk(Uint8Array.from(pixels), 2, 1, {
       ...options,
       sequenceIndex,
-      totalFrames: frames.length,
       globalPalette,
     }),
   );
@@ -52,12 +51,10 @@ test("unordered independent chunks match sequential global and local palette fra
   );
   sequential.finish();
   const chunks = makeChunks();
-  const bytes = assembleFrameChunks([
-    chunks[2],
-    chunks[0],
-    chunks[3],
-    chunks[1],
-  ]);
+  const bytes = assembleFrameChunks(
+    [chunks[2], chunks[0], chunks[3], chunks[1]],
+    frames.length,
+  );
   assert.deepEqual(bytes, sequential.bytes());
   const reader = new GifReader(bytes);
   assert.equal(reader.numFrames(), 4);
@@ -69,40 +66,66 @@ test("unordered independent chunks match sequential global and local palette fra
 
 test("rejects missing, duplicate and inconsistent chunks and invalid palette indexes", () => {
   const chunks = makeChunks();
-  assert.throws(() => assembleFrameChunks(chunks.slice(0, 3)));
+  assert.throws(() => assembleFrameChunks(chunks.slice(0, 3), 4));
   assert.throws(() =>
-    assembleFrameChunks([chunks[0], chunks[1], chunks[1], chunks[3]]),
+    assembleFrameChunks([chunks[0], chunks[1], chunks[1], chunks[3]], 4),
   );
   assert.throws(() =>
-    assembleFrameChunks([
-      chunks[0],
-      { ...chunks[1], globalPalette: local },
-      chunks[2],
-      chunks[3],
-    ]),
+    assembleFrameChunks(
+      [chunks[0], { ...chunks[1], globalPalette: local }, chunks[2], chunks[3]],
+      4,
+    ),
   );
   assert.throws(() =>
-    assembleFrameChunks([
-      chunks[0],
-      { ...chunks[1], width: 3 },
-      chunks[2],
-      chunks[3],
-    ]),
+    assembleFrameChunks(
+      [chunks[0], { ...chunks[1], width: 3 }, chunks[2], chunks[3]],
+      4,
+    ),
   );
   assert.throws(() =>
     encodeFrameChunk(Uint8Array.of(2), 1, 1, {
       sequenceIndex: 1,
-      totalFrames: 2,
       globalPalette,
     }),
   );
   assert.throws(() =>
     encodeFrameChunk(Uint8Array.of(0), 1, 1, {
       sequenceIndex: 1,
-      totalFrames: 2,
       globalPalette,
       transparent: true,
       transparentIndex: 2,
+    }),
+  );
+});
+
+test("frames can be dispatched before the final count is known, including skipped sources", () => {
+  const sources = [Uint8Array.of(0), null, Uint8Array.of(1)];
+  const chunks = [];
+  let encodedFrameCount = 0;
+  for (const pixels of sources) {
+    if (pixels === null) continue;
+    chunks.push(
+      encodeFrameChunk(pixels, 1, 1, {
+        sequenceIndex: encodedFrameCount++,
+        globalPalette,
+      }),
+    );
+  }
+  const bytes = assembleFrameChunks(chunks.reverse(), encodedFrameCount);
+  const reader = new GifReader(bytes);
+  assert.equal(reader.numFrames(), 2);
+  const pixels = new Uint8Array(4);
+  reader.decodeAndBlitFrameRGBA(1, pixels);
+  assert.deepEqual([...pixels], [0, 255, 0, 255]);
+  assert.throws(() =>
+    assembleFrameChunks(chunks.slice(0, 1), encodedFrameCount),
+  );
+  assert.throws(() => assembleFrameChunks(chunks, 0));
+  assert.throws(() => assembleFrameChunks(chunks, 1.5));
+  assert.throws(() =>
+    encodeFrameChunk(Uint8Array.of(0), 1, 1, {
+      sequenceIndex: -1,
+      globalPalette,
     }),
   );
 });

@@ -15,17 +15,10 @@ export function encodeFrameChunk(
   height: number,
   options: FrameChunkOptions,
 ): FrameChunk {
-  const { sequenceIndex, totalFrames, globalPalette, ...frameOptions } =
-    options;
-  if (
-    !Number.isSafeInteger(totalFrames) ||
-    totalFrames < 1 ||
-    !Number.isSafeInteger(sequenceIndex) ||
-    sequenceIndex < 0 ||
-    sequenceIndex >= totalFrames
-  ) {
+  const { sequenceIndex, globalPalette, ...frameOptions } = options;
+  if (!Number.isSafeInteger(sequenceIndex) || sequenceIndex < 0) {
     throw new Error(
-      "encodeFrameChunk() expected a valid sequenceIndex and totalFrames",
+      "encodeFrameChunk() expected a nonnegative integer sequenceIndex",
     );
   }
   assertPalette(globalPalette, "encodeFrameChunk");
@@ -41,7 +34,6 @@ export function encodeFrameChunk(
   });
   return {
     sequenceIndex,
-    totalFrames,
     width,
     height,
     globalPalette: globalPalette.map((color) => [...color] as typeof color),
@@ -61,8 +53,15 @@ function samePalette(a: Palette, b: Palette): boolean {
 }
 
 /** Validate and assemble a complete, possibly unordered set of frame chunks. */
-export function assembleFrameChunks(chunks: readonly FrameChunk[]): ByteArray {
-  if (chunks.length === 0) {
+export function assembleFrameChunks(
+  chunks: readonly FrameChunk[],
+  expectedFrames: number,
+): ByteArray {
+  if (
+    !Number.isSafeInteger(expectedFrames) ||
+    expectedFrames < 1 ||
+    chunks.length !== expectedFrames
+  ) {
     throw new Error("assembleFrameChunks() expected a complete set of chunks");
   }
   const ordered: (FrameChunk | undefined)[] = Array.from({
@@ -70,7 +69,6 @@ export function assembleFrameChunks(chunks: readonly FrameChunk[]): ByteArray {
   });
   for (const chunk of chunks) {
     if (
-      chunk.totalFrames !== chunks.length ||
       !Number.isSafeInteger(chunk.sequenceIndex) ||
       chunk.sequenceIndex < 0 ||
       chunk.sequenceIndex >= chunks.length ||

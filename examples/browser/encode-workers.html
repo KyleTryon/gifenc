@@ -136,7 +136,6 @@
         workers.forEach((w) => {
           w.postMessage({
             event: "init",
-            totalFrames,
             format,
             delay,
             maxColors,
@@ -170,7 +169,7 @@
             // Once all chunks are ready
             const chunks = await Promise.all(frames);
 
-            const output = assembleFrameChunks(chunks);
+            const output = assembleFrameChunks(chunks, totalFrames);
 
             // Close workers
             workers.forEach((w) => w.terminate());

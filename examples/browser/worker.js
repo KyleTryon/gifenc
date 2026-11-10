@@ -16,7 +16,6 @@ self.addEventListener("message", (ev) => {
       width,
       height,
       maxColors = 256,
-      totalFrames,
       delay = 0,
     } = options;
 
@@ -33,7 +32,6 @@ self.addEventListener("message", (ev) => {
     // Encode into a single GIF frame chunk
     const chunk = encodeFrameChunk(index, width, height, {
       sequenceIndex: frame,
-      totalFrames,
       globalPalette,
       ...(frame === 0 ? {} : { palette }),
       delay,
