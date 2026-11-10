@@ -213,7 +213,24 @@ do not affect the snapshot; create a new mapper to use a new palette.
 cache is cleared before inserting another color, bounding memory across long
 animations. Call `reset()` to release cached entries while keeping the snapshot.
 Cache eviction and reset affect speed only. Larger limits can improve repeated
-high-color frames at the cost of retained memory.
+high-color frames at the cost of retained memory. Measure on your own frames:
+changing colors, a small cache, or low-color input can erase the benefit. Run
+`pnpm run build:esm && node bench/node/mapper.mjs` (requires ffmpeg) for a
+multi-frame comparison, including exact index checks and cache resets.
+
+For a shared-palette animation, quantize a representative sample once, then
+construct one mapper per worker and palette and reuse it for that worker's frames.
+See [`shared-palette-worker.js`](./examples/browser/shared-palette-worker.js)
+for the worker half of this pattern. Send the same palette to each worker and
+assemble the returned chunks in frame order as in the existing worker example.
+Create a new mapper when the palette changes. For spatial or temporal dithering,
+use `applyPalette` with its dithering options instead.
+
+Cliparr users: the installed 1.1.0 release does not contain this API. After a
+release containing it is available, upgrade to that release and use the shared
+palette mapper for Compact's non-dithered frames, initialized once per worker.
+Keep the existing dithering path for presets that use temporal history or change
+palettes; validate output and benchmark with representative clips.
 
 ### `createTemporalDither(options)`
 
