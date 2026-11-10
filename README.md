@@ -257,7 +257,7 @@ Frame options include:
 - `transparent`: enables one-bit transparency.
 - `transparentIndex`: palette index to treat as transparent.
 - `dispose`: GIF disposal method override.
-- `colorDepth`: integer from `1` to `8`, large enough for the active palette.
+- `colorDepth`: integer from `1` to `8`, large enough for the active palette. By default, compression uses the minimum depth for the active palette (at least 2 bits for GIF LZW), while the logical screen color resolution remains 8 bits. An explicit value also sets the logical screen color resolution on the first frame.
 
 Dimensions must be integers from `1` to `65535`. Later frames must fit within
 the first frame's logical screen. Every pixel index, and an enabled transparent
