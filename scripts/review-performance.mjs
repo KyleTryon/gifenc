@@ -60,6 +60,18 @@ for (const fixture of BENCH_IMAGE_FIXTURES) {
           ? ["applyPalette", "reusedMapper"]
           : ["applyPalette", "encode", "tinyEncode"];
     const mapper = candidate.createPaletteMapper?.(palette, format);
+    if (mapper) {
+      assert.deepEqual(
+        mapper.map(image.data),
+        index,
+        `${fixture.id}/${format}: reusable indexes changed`,
+      );
+      mapper.reset();
+    }
+    if (stage === "mapping" && !mapper)
+      throw new Error(
+        "Mapping benchmarks require createPaletteMapper in the candidate bundle",
+      );
     const actions = {
       quantize: [
         () => baseline.quantize(image.data, 256, { format }),

@@ -195,6 +195,26 @@ Maps RGBA pixels to palette indexes.
 
 Returns a `Uint8Array` with one palette index per pixel.
 
+### `createPaletteMapper(palette, options)`
+
+Use a reusable mapper when animation frames share a palette:
+
+```js
+const mapper = createPaletteMapper(palette, { format: "rgb565" });
+const index = mapper.map(frame.data);
+```
+
+The mapper snapshots the palette at construction, caches complete source colors,
+and produces the same indexes as `applyPalette`. It supports RGB and RGBA formats
+without spatial or temporal dithering. Later mutations of the original palette
+do not affect the snapshot; create a new mapper to use a new palette.
+
+`maxCacheEntries` defaults to `262144` and must be a positive safe integer. A full
+cache is cleared before inserting another color, bounding memory across long
+animations. Call `reset()` to release cached entries while keeping the snapshot.
+Cache eviction and reset affect speed only. Larger limits can improve repeated
+high-color frames at the cost of retained memory.
+
 ### `createTemporalDither(options)`
 
 Creates resettable temporal dithering state for an animation.

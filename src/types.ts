@@ -280,6 +280,32 @@ export type ApplyPaletteOptions = {
 };
 
 /**
+ * Format and cache limit for a reusable palette mapper.
+ */
+export type PaletteMapperOptions = {
+  /** Lookup format. Defaults to `"rgb565"`. */
+  format?: Format;
+  /** Maximum cached exact colors. Defaults to `262144`; must be a positive safe integer. */
+  maxCacheEntries?: number;
+};
+
+/** Reusable mapper with a snapshot of the supplied palette. */
+export type PaletteMapper = {
+  /**
+   * Palette lookup format used by this mapper.
+   */
+  readonly format: Format;
+  /**
+   * Convert one RGBA frame to palette indexes.
+   */
+  map: (rgba: RGBAInput) => ByteArray;
+  /**
+   * Clear cached nearest-color lookups while keeping the palette snapshot.
+   */
+  reset: () => void;
+};
+
+/**
  * Options for {@link GIFEncoder}.
  */
 export type GIFEncoderOptions = {
