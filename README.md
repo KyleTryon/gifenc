@@ -179,6 +179,27 @@ Returns a palette such as:
 ];
 ```
 
+### `createPaletteSampler(maxSamples, samplesPerFrame)`
+
+Build a shared palette from caller-selected RGBA frames without retaining or
+concatenating the full frames:
+
+```js
+const sampler = createPaletteSampler(120_000, 5_000);
+for (const frame of selectedFrames) sampler.addFrame(frame?.data);
+const palette = sampler.quantize(256, { format: "rgb565" });
+```
+
+The sampler owns a fixed `maxSamples * 4` byte buffer. It samples at most
+`samplesPerFrame` pixels across each complete frame, varying sample positions
+within strata to reduce regular-pattern aliasing. Sampling is deterministic, but
+cannot guarantee representation of every color. Missing and empty frames add
+nothing; a full sampler ignores later frames. Select frames and divide the budget
+among them in the caller to avoid favoring early frames. `addFrame` returns the
+number of pixels added. `quantize` accepts the same options and returns the same
+RGB or RGBA palette format as `quantize`; it returns `[]` if no pixels were added.
+Input is RGBA byte data, including for RGB palette formats.
+
 ### `applyPalette(rgba, palette, options)`
 
 Maps RGBA pixels to palette indexes.

@@ -3,6 +3,7 @@ export { default as quantize } from "./pnn-quant.js";
 export {
   applyPalette,
   createPaletteMapper,
+  createPaletteSampler,
   nearestColor,
   nearestColorIndex,
   nearestColorIndexWithDistance,
@@ -26,6 +27,7 @@ export type {
   Palette,
   PaletteMapper,
   PaletteMapperOptions,
+  PaletteSampler,
   PrequantizeOptions,
   QuantizeOptions,
   RGBA,

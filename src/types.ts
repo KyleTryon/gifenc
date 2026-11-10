@@ -107,6 +107,14 @@ export type QuantizeOptions = {
   useSqrt?: boolean;
 };
 
+/** Bounded sample accumulator for a palette shared across selected frames. */
+export type PaletteSampler = {
+  /** Add RGBA pixels, or skip a missing frame. Returns the number sampled. */
+  addFrame(rgba: RGBAInput | null | undefined): number;
+  /** Quantize accumulated pixels; returns an empty palette when none were added. */
+  quantize(maxColors: number, options?: QuantizeOptions): Palette;
+};
+
 /**
  * Options for {@link prequantize}.
  */
