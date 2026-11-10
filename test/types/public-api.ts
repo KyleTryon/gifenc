@@ -3,6 +3,7 @@ import {
   applyPalette,
   createPaletteMapper,
   createTemporalDither,
+  frameDelay,
   nearestColorIndex,
   nearestColorIndexWithDistance,
   quantize,
@@ -74,7 +75,12 @@ applyPalette(rgbaData, palette, {
 });
 temporalDither.reset();
 const normalizedChangeDetection = temporalDither.changeDetection;
-GIFEncoder().writeFrame(indexed, 1, 1, { palette: [rgb] });
+GIFEncoder().writeFrame(indexed, 1, 1, {
+  palette: [rgb],
+  delay: frameDelay(0, 100),
+});
+// @ts-expect-error boundaries must be numbers
+frameDelay("0", 100);
 
 const nearestIndex: number = nearestColorIndex(palette, rgb);
 const nearestWithDistance: [number, number] = nearestColorIndexWithDistance(

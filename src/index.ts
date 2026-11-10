@@ -1,3 +1,4 @@
+export { frameDelay } from "./timing.js";
 export { GIFEncoder, default } from "./encoder.js";
 export { default as quantize } from "./pnn-quant.js";
 export {
