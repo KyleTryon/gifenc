@@ -80,6 +80,9 @@
         try {
           // We use for 'of' to loop with async await
           for (let i of frames) {
+            // Wait for capacity before allocating the next frame.
+            await encoder.ready();
+
             // a t value 0..1 to animate the frame
             const playhead = i / totalFrames;
 
@@ -90,7 +93,7 @@
             const data = context.getImageData(0, 0, width, height).data;
 
             // Send data to worker
-            await encoder.addFrame(data, i);
+            encoder.addFrame(data, i);
 
             // Wait a tick so that we don't lock up browser
             await new Promise((resolve) => setTimeout(resolve, 0));
