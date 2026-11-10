@@ -195,6 +195,26 @@ Maps RGBA pixels to palette indexes.
 
 Returns a `Uint8Array` with one palette index per pixel.
 
+### `createPaletteMapper(palette, options)`
+
+Use a reusable mapper when animation frames share a palette:
+
+```js
+const mapper = createPaletteMapper(palette, { format: "rgb565" });
+const index = mapper.map(frame.data);
+```
+
+The mapper snapshots the palette at construction, caches complete source colors,
+and produces the same indexes as `applyPalette`. It supports RGB and RGBA formats
+without spatial or temporal dithering. Later mutations of the original palette
+do not affect the snapshot; create a new mapper to use a new palette.
+
+`maxCacheEntries` defaults to `262144` and must be a positive safe integer. A full
+cache is cleared before inserting another color, bounding memory across long
+animations. Call `reset()` to release cached entries while keeping the snapshot.
+Cache eviction and reset affect speed only. Larger limits can improve repeated
+high-color frames at the cost of retained memory.
+
 ### `createTemporalDither(options)`
 
 Creates resettable temporal dithering state for an animation.
@@ -237,6 +257,22 @@ Frame options include:
 - `transparent`: enables one-bit transparency.
 - `transparentIndex`: palette index to treat as transparent.
 - `dispose`: GIF disposal method override.
+- `colorDepth`: integer from `1` to `8`, large enough for the active palette.
+
+Dimensions must be integers from `1` to `65535`. Later frames must fit within
+the first frame's logical screen. Every pixel index, and an enabled transparent
+index, must reference an entry in the frame's local palette or the global palette.
+Manual worker chunks must supply a local palette when they do not initialize or
+already have a global palette. Invalid frames throw before modifying the stream.
+
+### Correctness changes
+
+**Breaking changes:** fractional and overflowing dimensions, out-of-palette
+indexes, and insufficient color depths are rejected. RGB565 now preserves six
+green bits, RGBA clustering considers alpha, and palette lookup caches complete
+source colors. Generated palettes and GIF bytes can therefore differ from earlier
+versions. `prequantize` clamps rounded channels instead of wrapping, and a numeric
+one-bit alpha threshold of `0` is honored.
 
 ### Color Helpers
 
@@ -323,6 +359,8 @@ Useful scripts:
 - `pnpm run build:benchmark-pages`: builds the static GitHub Pages benchmark
   artifact into `_site`.
 - `pnpm run check`: runs formatting, linting, type checks, and dependency checks.
+- `pnpm run test:package`: checks the built npm archive with ESM, CommonJS, and
+  TypeScript consumers.
 - `pnpm run serve`: starts the local example server.
 
 ## Publishing
@@ -335,6 +373,24 @@ The release workflow determines the version bump from commits since the latest
 `v*` tag. Breaking-change markers create a major release, `feat` commits create
 a minor release, and `fix`, `perf`, or `security` commits create a patch
 release.
+
+Pull requests and pushes to `main` run the full checks, package-consumer smoke
+tests, and benchmark-site build on Node.js 22.13.0, 24, and 26. CI also audits
+development dependencies. TypeScript stays on 6.x; its next major upgrade is
+deferred.
+
+Releases require that validation matrix to pass, validate the bumped package,
+and publish the checked archive before atomically pushing the release commit and
+tag. The workflow uses npm trusted publishing; configure this repository and
+`release.yml` as the package's trusted publisher on npm.
+
+If publication succeeds but pushing fails, dispatch the workflow again from
+unchanged `main`. It resumes only when the existing npm version's integrity
+matches the rebuilt archive. A version with different contents stops the release
+for investigation. If pushing succeeds but release-note creation fails, dispatch
+again from `main` to recover the missing GitHub release. If `main` advances during
+publication, reconcile the published version before attempting another release;
+npm publication cannot be rolled back.
 
 ## Credits
 

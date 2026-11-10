@@ -1,4 +1,4 @@
-export { applyPalette } from "./apply.js";
+export { applyPalette, createPaletteMapper } from "./apply.js";
 export {
   nearestColor,
   nearestColorIndex,

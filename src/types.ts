@@ -267,7 +267,7 @@ export type ApplyPaletteOptions = {
   /**
    * Reverse every other dither row to reduce directional artifacts.
    *
-   * Defaults to `false`.
+   * Defaults to `true`.
    */
   serpentine?: boolean;
   /**
@@ -277,6 +277,32 @@ export type ApplyPaletteOptions = {
    * the same state while mapping each frame.
    */
   temporalDither?: TemporalDitherState | false | null;
+};
+
+/**
+ * Format and cache limit for a reusable palette mapper.
+ */
+export type PaletteMapperOptions = {
+  /** Lookup format. Defaults to `"rgb565"`. */
+  format?: Format;
+  /** Maximum cached exact colors. Defaults to `262144`; must be a positive safe integer. */
+  maxCacheEntries?: number;
+};
+
+/** Reusable mapper with a snapshot of the supplied palette. */
+export type PaletteMapper = {
+  /**
+   * Palette lookup format used by this mapper.
+   */
+  readonly format: Format;
+  /**
+   * Convert one RGBA frame to palette indexes.
+   */
+  map: (rgba: RGBAInput) => ByteArray;
+  /**
+   * Clear cached nearest-color lookups while keeping the palette snapshot.
+   */
+  reset: () => void;
 };
 
 /**
@@ -344,7 +370,8 @@ export type WriteFrameOptions = {
    */
   dispose?: number;
   /**
-   * GIF color resolution field.
+   * GIF color resolution and compression depth, an integer from `1` to `8`.
+   * Must accommodate every entry in the active palette.
    *
    * Defaults to `8`.
    */
@@ -429,7 +456,9 @@ export type GIFEncoderInstance = {
   /**
    * Encode one indexed frame.
    *
-   * `index` must contain exactly `width * height` palette indexes.
+   * Dimensions must be integers from `1` to `65535`; subsequent frames must
+   * fit within the first frame's logical screen. `index` must be a Uint8Array
+   * containing exactly `width * height` indexes into the active palette.
    */
   writeFrame: (
     index: ByteArray,

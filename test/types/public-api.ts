@@ -1,6 +1,7 @@
 import {
   GIFEncoder,
   applyPalette,
+  createPaletteMapper,
   createTemporalDither,
   nearestColorIndex,
   nearestColorIndexWithDistance,
@@ -8,6 +9,8 @@ import {
   type ApplyPaletteOptions,
   type Color,
   type Palette,
+  type PaletteMapper,
+  type PaletteMapperOptions,
   type RGB,
   type RGBA,
   type TemporalDitherChangeDetectionOptions,
@@ -33,6 +36,15 @@ const paletteOptions: ApplyPaletteOptions = {
   width: 1,
   height: 1,
 };
+const paletteMapper: PaletteMapper = createPaletteMapper(quantized, "rgba4444");
+const mapperOptions: PaletteMapperOptions = {
+  format: "rgba4444",
+  maxCacheEntries: 16,
+};
+createPaletteMapper(quantized, mapperOptions);
+// @ts-expect-error reusable mappers do not support error diffusion
+createPaletteMapper(quantized, { dither: true });
+const mappedWithReusableCache = paletteMapper.map(rgbaData);
 const temporalOptions: TemporalDitherOptions = {
   width: 1,
   height: 1,
@@ -73,6 +85,7 @@ const nearestWithDistance: [number, number] = nearestColorIndexWithDistance(
 void nearestIndex;
 void nearestWithDistance;
 void normalizedChangeDetection;
+void mappedWithReusableCache;
 
 // @ts-expect-error invalid color format
 quantize(rgbaData, 2, { format: "rgb666" });
