@@ -75,9 +75,9 @@ applyPalette(rgbaData, palette, {
 temporalDither.reset();
 const normalizedChangeDetection = temporalDither.changeDetection;
 GIFEncoder().writeFrame(indexed, 1, 1, { palette: [rgb] });
-const transferableOutput: Uint8Array<ArrayBuffer> = GIFEncoder().takeBytes();
-const transferableStreamOutput: Uint8Array<ArrayBuffer> =
-  GIFEncoder().stream.takeBytes();
+const transferableOutput: ArrayBuffer = GIFEncoder().takeBytes().buffer;
+const transferableStreamOutput: ArrayBuffer =
+  GIFEncoder().stream.takeBytes().buffer;
 void transferableOutput;
 void transferableStreamOutput;
 
