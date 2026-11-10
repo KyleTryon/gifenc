@@ -209,10 +209,16 @@ test("sequence lifecycle isolates animations and resets scene history", () => {
   assert.equal(map(next), 0);
   assert.equal(map(first), 0);
   sequence.end();
+  sequence.end();
   assert.equal(map(next), 0);
   assert.throws(() => sequence.reset(), /not been started/);
-  const independent = createTemporalDitherSequence().start(options);
+  const otherSequence = createTemporalDitherSequence();
+  const independent = otherSequence.start(options);
+  const concurrent = sequence.start(options);
   assert.equal(map(independent), 0);
+  assert.equal(map(concurrent), 0);
+  assert.equal(map(independent), 1);
+  assert.equal(map(concurrent), 1);
   const resized = sequence.start({
     ...options,
     width: 2,

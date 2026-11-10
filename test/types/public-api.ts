@@ -62,9 +62,9 @@ const temporalDither: TemporalDitherState =
 
 const sequence: TemporalDitherSequence = createTemporalDitherSequence();
 const sequenceState: TemporalDitherState = sequence.start(temporalOptions);
+applyPalette(rgbaData, quantized, { temporalDither: sequenceState });
 sequence.reset();
 sequence.end();
-applyPalette(rgbaData, quantized, { temporalDither: sequenceState });
 
 applyPalette(rgbaData, quantized, paletteOptions);
 createTemporalDither({
