@@ -1,11 +1,7 @@
-import {
-  rgb888_to_rgb444,
-  rgb888_to_rgb565,
-  rgba8888_to_rgba4444,
-} from "../rgb-packing.js";
 import { assertRgbaInput, createUint32PixelView } from "../rgba.js";
 import { assertPalette, assertPaletteMatchesFormat } from "../validation.js";
 import { applyPaletteDither } from "./dither.js";
+import { createPaletteLookup } from "./lookup.js";
 import { normalizeApplyPaletteOptions } from "./options.js";
 import { uint32At } from "./utils.js";
 import type {
@@ -45,27 +41,11 @@ export function applyPalette(
 
   const data = createUint32PixelView(rgba, "applyPalette");
   const length = data.length;
-  const bincount = format === "rgb444" ? 4096 : 65536;
   const index = new Uint8Array(length);
-  const cache = new Int16Array(bincount);
-  cache.fill(-1);
-  const paletteLength = palette.length;
-  const paletteR = new Uint8Array(paletteLength);
-  const paletteG = new Uint8Array(paletteLength);
-  const paletteB = new Uint8Array(paletteLength);
-  const paletteA = new Uint8Array(paletteLength);
-  for (let i = 0; i < paletteLength; i++) {
-    const color = palette[i];
-    if (!color) {
-      throw new Error(
-        `applyPalette() expected palette color at index ${String(i)}`,
-      );
-    }
-    paletteR[i] = color[0];
-    paletteG[i] = color[1];
-    paletteB[i] = color[2];
-    paletteA[i] = color[3] ?? 0xff;
-  }
+  // Cache complete source colors so collisions cannot make a pixel's mapping
+  // depend on the order in which other pixels were encountered.
+  const cache = new Map<number, number>();
+  const nearest = createPaletteLookup(palette, format === "rgba4444");
 
   // Some duplicate code below due to very hot code path.
   // Introducing branching/conditions shows significant impact.
@@ -76,108 +56,29 @@ export function applyPalette(
       const b = (color >> 16) & 0xff;
       const g = (color >> 8) & 0xff;
       const r = color & 0xff;
-      const key = rgba8888_to_rgba4444(r, g, b, a);
-      let idx = cache[key] ?? -1;
-      if (idx < 0) {
-        idx = nearestColorIndexRGBAChannels(
-          r,
-          g,
-          b,
-          a,
-          paletteR,
-          paletteG,
-          paletteB,
-          paletteA,
-          paletteLength,
-        );
-        cache[key] = idx;
+      const key = color;
+      let idx = cache.get(key);
+      if (idx == null) {
+        idx = nearest(r, g, b, a);
+        cache.set(key, idx);
       }
       index[i] = idx;
     }
   } else {
-    const rgb888_to_key =
-      format === "rgb444" ? rgb888_to_rgb444 : rgb888_to_rgb565;
     for (let i = 0; i < length; i++) {
       const color = uint32At(data, i);
       const b = (color >> 16) & 0xff;
       const g = (color >> 8) & 0xff;
       const r = color & 0xff;
-      const key = rgb888_to_key(r, g, b);
-      let idx = cache[key] ?? -1;
-      if (idx < 0) {
-        idx = nearestColorIndexRGBChannels(
-          r,
-          g,
-          b,
-          paletteR,
-          paletteG,
-          paletteB,
-          paletteLength,
-        );
-        cache[key] = idx;
+      const key = color & 0xffffff;
+      let idx = cache.get(key);
+      if (idx == null) {
+        idx = nearest(r, g, b);
+        cache.set(key, idx);
       }
       index[i] = idx;
     }
   }
 
   return index;
-}
-
-function nearestColorIndexRGBChannels(
-  r: number,
-  g: number,
-  b: number,
-  paletteR: Uint8Array,
-  paletteG: Uint8Array,
-  paletteB: Uint8Array,
-  paletteLength: number,
-): number {
-  let k = 0;
-  let mindist = 1e100;
-  for (let i = 0; i < paletteLength; i++) {
-    const dr = (paletteR[i] ?? 0) - r;
-    let curdist = dr * dr;
-    if (curdist > mindist) continue;
-    const dg = (paletteG[i] ?? 0) - g;
-    curdist += dg * dg;
-    if (curdist > mindist) continue;
-    const db = (paletteB[i] ?? 0) - b;
-    curdist += db * db;
-    if (curdist > mindist) continue;
-    mindist = curdist;
-    k = i;
-  }
-  return k;
-}
-
-function nearestColorIndexRGBAChannels(
-  r: number,
-  g: number,
-  b: number,
-  a: number,
-  paletteR: Uint8Array,
-  paletteG: Uint8Array,
-  paletteB: Uint8Array,
-  paletteA: Uint8Array,
-  paletteLength: number,
-): number {
-  let k = 0;
-  let mindist = 1e100;
-  for (let i = 0; i < paletteLength; i++) {
-    const da = (paletteA[i] ?? 0xff) - a;
-    let curdist = da * da;
-    if (curdist > mindist) continue;
-    const dr = (paletteR[i] ?? 0) - r;
-    curdist += dr * dr;
-    if (curdist > mindist) continue;
-    const dg = (paletteG[i] ?? 0) - g;
-    curdist += dg * dg;
-    if (curdist > mindist) continue;
-    const db = (paletteB[i] ?? 0) - b;
-    curdist += db * db;
-    if (curdist > mindist) continue;
-    mindist = curdist;
-    k = i;
-  }
-  return k;
 }
