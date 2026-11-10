@@ -1,13 +1,18 @@
 import constants from "./constants.js";
-import lzwEncode from "./lzw-encode.js";
+import lzwEncode, { LZW_HASH_SIZE, LZW_LARGE_HASH_SIZE } from "./lzw-encode.js";
 import createStream from "./stream.js";
-import { assertPalette } from "./validation.js";
+import {
+  assertPalette,
+  assertColorDepth,
+  assertDelay,
+  assertDispose,
+  assertRepeat,
+  assertTransparentIndex,
+} from "./validation.js";
 import type {
   ByteStream,
-  ByteArray,
   GIFEncoderInstance,
   GIFEncoderOptions,
-  Int32Buffer,
   Palette,
 } from "./types.js";
 
@@ -34,17 +39,22 @@ export function GIFEncoder(opt: GIFEncoderOptions = {}): GIFEncoderInstance {
   const stream = createStream(initialCapacity);
 
   // Shared array data across all frames
-  const HSIZE = 5003; // 80% occupancy
   const accum = new Uint8Array(256);
-  const htab = new Int32Array(HSIZE);
-  const codetab = new Int32Array(HSIZE);
+  let htab = new Int32Array(LZW_HASH_SIZE);
+  let codetab = new Int32Array(LZW_HASH_SIZE);
 
   let hasInit = false;
+  let globalPaletteLength = 0;
+  let screenWidth = 0;
+  let screenHeight = 0;
 
   return {
     reset() {
       stream.reset();
       hasInit = false;
+      globalPaletteLength = 0;
+      screenWidth = 0;
+      screenHeight = 0;
     },
     finish() {
       stream.writeByte(constants.trailer);
@@ -80,42 +90,110 @@ export function GIFEncoder(opt: GIFEncoderOptions = {}): GIFEncoderInstance {
         if (!hasInit) {
           // have not yet init, we can consider this our first frame
           first = true;
-          // in 'auto' mode, we also encode a header on first frame
-          // this is different than manual mode where you must encode
-          // header yoursef (or perhaps not write header altogether)
-          writeHeader();
-          hasInit = true;
         }
       } else {
         // in manual mode, the first frame is determined by the options only
         first = Boolean(opts.first);
       }
 
-      width = Math.max(0, Math.floor(width));
-      height = Math.max(0, Math.floor(height));
-      if (width < 1 || height < 1) {
-        throw new Error("GIFEncoder.writeFrame() expected positive dimensions");
+      if (
+        !Number.isInteger(width) ||
+        !Number.isInteger(height) ||
+        width < 1 ||
+        height < 1 ||
+        width > 0xffff ||
+        height > 0xffff
+      ) {
+        throw new Error(
+          "GIFEncoder.writeFrame() expected integer dimensions in the range 1..65535",
+        );
+      }
+      if (
+        !first &&
+        screenWidth > 0 &&
+        (width > screenWidth || height > screenHeight)
+      ) {
+        throw new Error(
+          "GIFEncoder.writeFrame() expected frame dimensions within the logical screen",
+        );
+      }
+      if (!(index instanceof Uint8Array)) {
+        throw new Error(
+          "GIFEncoder.writeFrame() expected index to be a Uint8Array",
+        );
       }
       if (index.length !== width * height) {
         throw new Error(
           "GIFEncoder.writeFrame() expected index length to match width * height",
         );
       }
+      assertColorDepth(colorDepth, "GIFEncoder.writeFrame");
+      assertTransparentIndex(transparentIndex, "GIFEncoder.writeFrame");
+      assertDelay(delay, "GIFEncoder.writeFrame");
+      assertRepeat(repeat, "GIFEncoder.writeFrame");
+      assertDispose(dispose, "GIFEncoder.writeFrame");
 
-      // Write pre-frame details such as repeat count and global palette
-      if (first) {
-        if (!palette) {
-          throw new Error("First frame must include a { palette } option");
-        }
+      const globalPalette = first ? palette : null;
+      const localPalette = !first ? palette : null;
+      if (first && !globalPalette) {
+        throw new Error("First frame must include a { palette } option");
+      }
+      if (palette !== null) {
         assertPalette(palette, "GIFEncoder.writeFrame");
+      }
+      const paletteLength = palette?.length ?? globalPaletteLength;
+      if (paletteLength === 0) {
+        throw new Error(
+          "GIFEncoder.writeFrame() requires a palette or a previously written global palette",
+        );
+      }
+      if (paletteLength > 1 << colorDepth) {
+        throw new Error(
+          "GIFEncoder.writeFrame() expected colorDepth to accommodate the active palette",
+        );
+      }
+      if (transparent && transparentIndex >= paletteLength) {
+        throw new Error(
+          "GIFEncoder.writeFrame() expected transparentIndex within the active palette",
+        );
+      }
+      for (const pixel of index) {
+        if (pixel >= paletteLength) {
+          throw new Error(
+            "GIFEncoder.writeFrame() expected every index within the active palette",
+          );
+        }
+      }
+
+      // All validation is done; from here on every write is unconditional so
+      // a failing call leaves the stream untouched and the encoder usable.
+      // Large frames benefit from fewer hash probes; small frames avoid the
+      // allocation and clearing cost of the larger table.
+      if (
+        index.length >= 16384 &&
+        paletteLength > 16 &&
+        htab.length === LZW_HASH_SIZE
+      ) {
+        htab = new Int32Array(LZW_LARGE_HASH_SIZE);
+        codetab = new Int32Array(LZW_LARGE_HASH_SIZE);
+      }
+      if (first && auto) {
+        writeHeader();
+        hasInit = true;
+      }
+      // Write pre-frame details such as repeat count and global palette
+      if (first && globalPalette) {
+        globalPaletteLength = globalPalette.length;
+        screenWidth = width;
+        screenHeight = height;
         encodeLogicalScreenDescriptor(
           stream,
           width,
           height,
-          palette,
+          globalPalette,
           colorDepth,
         );
-        encodeColorTable(stream, palette);
+        encodeColorTable(stream, globalPalette);
         if (repeat >= 0) {
           encodeNetscapeExt(stream, repeat);
         }
@@ -130,22 +208,9 @@ export function GIFEncoder(opt: GIFEncoderOptions = {}): GIFEncoderInstance {
         transparentIndex,
       );
 
-      const localPalette = palette && !first ? palette : null;
-      if (localPalette) {
-        assertPalette(localPalette, "GIFEncoder.writeFrame");
-      }
       encodeImageDescriptor(stream, width, height, localPalette);
       if (localPalette) encodeColorTable(stream, localPalette);
-      encodePixels(
-        stream,
-        index,
-        width,
-        height,
-        colorDepth,
-        accum,
-        htab,
-        codetab,
-      );
+      lzwEncode(index, colorDepth, stream, accum, htab, codetab);
     },
   };
 
@@ -273,19 +338,6 @@ function encodeImageDescriptor(
     // global palette
     stream.writeByte(0);
   }
-}
-
-function encodePixels(
-  stream: ByteStream,
-  index: ByteArray,
-  width: number,
-  height: number,
-  colorDepth: number,
-  accum: ByteArray,
-  htab: Int32Buffer,
-  codetab: Int32Buffer,
-): void {
-  lzwEncode(width, height, index, colorDepth, stream, accum, htab, codetab);
 }
 
 // Utilities

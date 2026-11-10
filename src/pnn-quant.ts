@@ -13,6 +13,7 @@ import {
 } from "./rgb-packing.js";
 import { assertRgbaInput, createUint32PixelView } from "./rgba.js";
 import { assertMaxColors, normalizeFormat } from "./validation.js";
+import { sqr, uint32At } from "./palette/utils.js";
 
 import type {
   Color,
@@ -40,18 +41,6 @@ type BinList = Array<Bin | undefined>;
 
 function clamp(value: number, min: number, max: number): number {
   return value < min ? min : value > max ? max : value;
-}
-
-function sqr(value: number): number {
-  return value * value;
-}
-
-function uint32At(data: Uint32Array, index: number): number {
-  const value = data[index];
-  if (value == null) {
-    throw new Error(`Expected uint32 pixel at index ${String(index)}`);
-  }
-  return value;
 }
 
 function binAt(bins: BinList, index: number): Bin {
@@ -275,7 +264,7 @@ export default function quantize(
   let l2: number;
   /* Initialize nearest neighbors and build heap of them */
   for (i = 0; i < maxbins; ++i) {
-    find_nn(bins, i, false);
+    find_nn(bins, i, hasAlpha);
     /* Push slot on heap */
     const err = binAt(bins, i).err;
     const heapSize = heapAt(heap, 0) + 1;
@@ -291,7 +280,7 @@ export default function quantize(
 
   /* Merge bins which increase error the least */
   const extbins = maxbins - maxColors;
-  for (i = 0; i < extbins; ) {
+  for (i = 0; i < extbins;) {
     let tb: Bin;
     /* Use heap to find which bins to merge */
     for (;;) {
@@ -306,7 +295,7 @@ export default function quantize(
         heap[0] = heapAt(heap, 0) - 1;
       } else {
         /* Too old error value */
-        find_nn(bins, b1, false);
+        find_nn(bins, b1, hasAlpha);
         tb.tm = i;
       }
       /* Push slot down */
@@ -348,7 +337,7 @@ export default function quantize(
   const palette: Palette = [];
 
   /* Fill palette */
-  for (i = 0; ; ) {
+  for (i = 0; ;) {
     const bin = binAt(bins, i);
     let r = clamp(Math.round(bin.rc), 0, 0xff);
     let g = clamp(Math.round(bin.gc), 0, 0xff);
@@ -357,7 +346,7 @@ export default function quantize(
     let a = 0xff;
     if (hasAlpha) {
       a = clamp(Math.round(bin.ac), 0, 0xff);
-      if (oneBitAlpha) {
+      if (oneBitAlpha !== false) {
         const threshold = typeof oneBitAlpha === "number" ? oneBitAlpha : 127;
         a = a <= threshold ? 0x00 : 0xff;
       }

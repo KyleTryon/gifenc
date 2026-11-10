@@ -10,7 +10,7 @@ await rm(site, { recursive: true, force: true });
 await copyFile("dist/gifenc.mjs");
 await copyFile("dist/gifenc.mjs.map");
 await copyDirectory("bench/video-report");
-await copyDirectory("bench/fixtures");
+await copyDirectory("fixtures");
 
 await writeFile(join(site, ".nojekyll"), "", "utf8");
 

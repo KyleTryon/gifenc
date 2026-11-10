@@ -25,6 +25,7 @@ export type {
   Int32Buffer,
   Palette,
   PaletteMapper,
+  PaletteMapperOptions,
   PrequantizeOptions,
   QuantizeOptions,
   RGBA,

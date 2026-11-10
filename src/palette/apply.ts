@@ -1,11 +1,7 @@
-import {
-  rgb888_to_rgb444,
-  rgb888_to_rgb565,
-  rgba8888_to_rgba4444,
-} from "../rgb-packing.js";
 import { assertRgbaInput, createUint32PixelView } from "../rgba.js";
 import { assertPalette, assertPaletteMatchesFormat } from "../validation.js";
 import { applyPaletteDither } from "./dither.js";
+import { createPaletteLookup } from "./lookup.js";
 import { normalizeApplyPaletteOptions } from "./options.js";
 import { uint32At } from "./utils.js";
 import type {
@@ -13,6 +9,7 @@ import type {
   Format,
   Palette,
   PaletteMapper,
+  PaletteMapperOptions,
   RGBAInput,
 } from "../types.js";
 
@@ -39,78 +36,74 @@ export function applyPalette(
   const opts = normalizeApplyPaletteOptions(options);
   assertPalette(palette, "applyPalette");
   assertPaletteMatchesFormat(palette, opts.format, "applyPalette");
+  const { format } = opts;
   if (opts.dither || opts.temporalDither) {
     return applyPaletteDither(rgba, palette, opts);
   }
 
-  return createPaletteMapper(palette, options).map(rgba);
+  return createMapper(palette, format, Infinity, "applyPalette").map(rgba);
 }
 
 /**
- * Create a reusable mapper for converting RGBA pixels to palette indexes.
- *
- * This avoids rebuilding nearest-color lookup caches when several frames use
- * the same palette and format. Dithering options are intentionally unsupported
- * here because error diffusion is frame-local state.
- *
- * @param palette - Palette containing 1 to 256 RGB or RGBA colors.
- * @param options - Palette format string or non-dithered mapping options.
- * @returns A reusable mapper with a persistent lookup cache.
+ * Snapshot a palette and reuse exact-color lookup state across animation frames.
+ * Dithering is unsupported. The bounded cache is cleared when it fills;
+ * eviction and reset affect performance only, never the mapped colors.
  */
 export function createPaletteMapper(
   palette: Palette,
-  options: Format | ApplyPaletteOptions | null = "rgb565",
+  options: Format | PaletteMapperOptions | null = "rgb565",
 ): PaletteMapper {
   const opts = normalizeApplyPaletteOptions(options);
   if (opts.dither || opts.temporalDither) {
     throw new Error("createPaletteMapper() does not support dithering options");
   }
-
   assertPalette(palette, "createPaletteMapper");
   assertPaletteMatchesFormat(palette, opts.format, "createPaletteMapper");
-  const { format } = opts;
-  const bincount = format === "rgb444" ? 4096 : 65536;
-  const cache = new Int16Array(bincount);
-  const paletteLength = palette.length;
-  const paletteR = new Uint8Array(paletteLength);
-  const paletteG = new Uint8Array(paletteLength);
-  const paletteB = new Uint8Array(paletteLength);
-  const paletteA = new Uint8Array(paletteLength);
-
-  for (let i = 0; i < paletteLength; i++) {
-    const color = palette[i];
-    if (!color) {
-      throw new Error(
-        `createPaletteMapper() expected palette color at index ${String(i)}`,
-      );
-    }
-    paletteR[i] = color[0];
-    paletteG[i] = color[1];
-    paletteB[i] = color[2];
-    paletteA[i] = color[3] ?? 0xff;
+  const maxCacheEntries =
+    typeof options === "object" && options !== null
+      ? (options.maxCacheEntries ?? 262144)
+      : 262144;
+  if (!Number.isSafeInteger(maxCacheEntries) || maxCacheEntries < 1) {
+    throw new Error(
+      "createPaletteMapper() expected maxCacheEntries to be a positive safe integer",
+    );
   }
+  return createMapper(
+    palette,
+    opts.format,
+    maxCacheEntries,
+    "PaletteMapper.map",
+  );
+}
 
-  reset();
-
+function createMapper(
+  palette: Palette,
+  format: Format,
+  maxCacheEntries: number,
+  functionName: string,
+): PaletteMapper {
+  const nearest = createPaletteLookup(palette, format === "rgba4444");
+  const cache = new Map<number, number>();
   return {
     format,
     map,
-    reset,
+    reset: () => {
+      cache.clear();
+    },
   };
 
-  function reset(): void {
-    cache.fill(-1);
+  function remember(key: number, index: number): void {
+    if (cache.size >= maxCacheEntries) cache.clear();
+    cache.set(key, index);
   }
 
   function map(rgba: RGBAInput): Uint8Array {
-    assertRgbaInput(rgba, "PaletteMapper.map");
-    return mapPalette(rgba);
-  }
-
-  function mapPalette(rgba: RGBAInput): Uint8Array {
-    const data = createUint32PixelView(rgba, "applyPalette");
+    assertRgbaInput(rgba, functionName);
+    const data = createUint32PixelView(rgba, functionName);
     const length = data.length;
     const index = new Uint8Array(length);
+    // Cache complete source colors so collisions cannot make a pixel's mapping
+    // depend on the order in which other pixels were encountered.
 
     // Some duplicate code below due to very hot code path.
     // Introducing branching/conditions shows significant impact.
@@ -121,45 +114,25 @@ export function createPaletteMapper(
         const b = (color >> 16) & 0xff;
         const g = (color >> 8) & 0xff;
         const r = color & 0xff;
-        const key = rgba8888_to_rgba4444(r, g, b, a);
-        let idx = cache[key] ?? -1;
-        if (idx < 0) {
-          idx = nearestColorIndexRGBAChannels(
-            r,
-            g,
-            b,
-            a,
-            paletteR,
-            paletteG,
-            paletteB,
-            paletteA,
-            paletteLength,
-          );
-          cache[key] = idx;
+        const key = color;
+        let idx = cache.get(key);
+        if (idx == null) {
+          idx = nearest(r, g, b, a);
+          remember(key, idx);
         }
         index[i] = idx;
       }
     } else {
-      const rgb888_to_key =
-        format === "rgb444" ? rgb888_to_rgb444 : rgb888_to_rgb565;
       for (let i = 0; i < length; i++) {
         const color = uint32At(data, i);
         const b = (color >> 16) & 0xff;
         const g = (color >> 8) & 0xff;
         const r = color & 0xff;
-        const key = rgb888_to_key(r, g, b);
-        let idx = cache[key] ?? -1;
-        if (idx < 0) {
-          idx = nearestColorIndexRGBChannels(
-            r,
-            g,
-            b,
-            paletteR,
-            paletteG,
-            paletteB,
-            paletteLength,
-          );
-          cache[key] = idx;
+        const key = color & 0xffffff;
+        let idx = cache.get(key);
+        if (idx == null) {
+          idx = nearest(r, g, b);
+          remember(key, idx);
         }
         index[i] = idx;
       }
@@ -167,63 +140,4 @@ export function createPaletteMapper(
 
     return index;
   }
-}
-
-function nearestColorIndexRGBChannels(
-  r: number,
-  g: number,
-  b: number,
-  paletteR: Uint8Array,
-  paletteG: Uint8Array,
-  paletteB: Uint8Array,
-  paletteLength: number,
-): number {
-  let k = 0;
-  let mindist = 1e100;
-  for (let i = 0; i < paletteLength; i++) {
-    const dr = (paletteR[i] ?? 0) - r;
-    let curdist = dr * dr;
-    if (curdist > mindist) continue;
-    const dg = (paletteG[i] ?? 0) - g;
-    curdist += dg * dg;
-    if (curdist > mindist) continue;
-    const db = (paletteB[i] ?? 0) - b;
-    curdist += db * db;
-    if (curdist > mindist) continue;
-    mindist = curdist;
-    k = i;
-  }
-  return k;
-}
-
-function nearestColorIndexRGBAChannels(
-  r: number,
-  g: number,
-  b: number,
-  a: number,
-  paletteR: Uint8Array,
-  paletteG: Uint8Array,
-  paletteB: Uint8Array,
-  paletteA: Uint8Array,
-  paletteLength: number,
-): number {
-  let k = 0;
-  let mindist = 1e100;
-  for (let i = 0; i < paletteLength; i++) {
-    const da = (paletteA[i] ?? 0xff) - a;
-    let curdist = da * da;
-    if (curdist > mindist) continue;
-    const dr = (paletteR[i] ?? 0) - r;
-    curdist += dr * dr;
-    if (curdist > mindist) continue;
-    const dg = (paletteG[i] ?? 0) - g;
-    curdist += dg * dg;
-    if (curdist > mindist) continue;
-    const db = (paletteB[i] ?? 0) - b;
-    curdist += db * db;
-    if (curdist > mindist) continue;
-    mindist = curdist;
-    k = i;
-  }
-  return k;
 }
