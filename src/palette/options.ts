@@ -1,5 +1,4 @@
-import { normalizeFormat } from "../validation.js";
-import { describeValue } from "./utils.js";
+import { describeValue, normalizeFormat } from "../validation.js";
 import type {
   ApplyPaletteOptions,
   DitherAlgorithm,

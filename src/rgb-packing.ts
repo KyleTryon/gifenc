@@ -1,5 +1,5 @@
 export function rgb888_to_rgb565(r: number, g: number, b: number): number {
-  return ((r << 8) & 0xf800) | ((g << 2) & 0x03e0) | (b >> 3);
+  return ((r << 8) & 0xf800) | ((g << 3) & 0x07e0) | (b >> 3);
 }
 
 export function rgba8888_to_rgba4444(

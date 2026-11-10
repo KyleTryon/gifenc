@@ -1,14 +1,5 @@
 import { euclideanDistanceSquared } from "../color.js";
-import {
-  alpha,
-  blue,
-  cloneColor,
-  colorAt,
-  green,
-  red,
-  sqr,
-  toRGB,
-} from "./utils.js";
+import { blue, cloneColor, colorAt, green, red, sqr, toRGB } from "./utils.js";
 import type { Color, DistanceFn, Palette } from "../types.js";
 
 export function nearestColorIndexRGBA(
@@ -21,17 +12,17 @@ export function nearestColorIndexRGBA(
   let k = 0;
   let mindist = 1e100;
   for (let i = 0; i < palette.length; i++) {
-    const px2 = colorAt(palette, i);
-    const a2 = alpha(px2);
+    const px2 = palette[i];
+    if (px2 == null) {
+      throw new Error(`Expected palette color at index ${String(i)}`);
+    }
+    const [r2, g2, b2, a2 = 0xff] = px2;
     let curdist = sqr(a2 - a);
     if (curdist > mindist) continue;
-    const r2 = red(px2);
     curdist += sqr(r2 - r);
     if (curdist > mindist) continue;
-    const g2 = green(px2);
     curdist += sqr(g2 - g);
     if (curdist > mindist) continue;
-    const b2 = blue(px2);
     curdist += sqr(b2 - b);
     if (curdist > mindist) continue;
     mindist = curdist;
@@ -49,14 +40,17 @@ export function nearestColorIndexRGB(
   let k = 0;
   let mindist = 1e100;
   for (let i = 0; i < palette.length; i++) {
-    const px2 = colorAt(palette, i);
-    const r2 = red(px2);
+    const px2 = palette[i];
+    if (px2 == null) {
+      throw new Error(`Expected palette color at index ${String(i)}`);
+    }
+    const r2 = px2[0];
     let curdist = sqr(r2 - r);
     if (curdist > mindist) continue;
-    const g2 = green(px2);
+    const g2 = px2[1];
     curdist += sqr(g2 - g);
     if (curdist > mindist) continue;
-    const b2 = blue(px2);
+    const b2 = px2[2];
     curdist += sqr(b2 - b);
     if (curdist > mindist) continue;
     mindist = curdist;

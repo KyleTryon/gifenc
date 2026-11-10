@@ -2,7 +2,7 @@ import type { Color, Format, Palette } from "./types.js";
 
 const FORMATS = new Set<Format>(["rgb565", "rgb444", "rgba4444"]);
 
-function describeValue(value: unknown): string {
+export function describeValue(value: unknown): string {
   if (
     value == null ||
     typeof value === "string" ||
@@ -89,5 +89,74 @@ export function assertPaletteMatchesFormat(
         `${functionName}() expected RGBA palette colors for rgba4444 format`,
       );
     }
+  }
+}
+
+export function assertColorDepth(
+  colorDepth: unknown,
+  functionName: string,
+): void {
+  if (
+    typeof colorDepth !== "number" ||
+    !Number.isInteger(colorDepth) ||
+    colorDepth < 1 ||
+    colorDepth > 8
+  ) {
+    throw new Error(
+      `${functionName}() expected colorDepth to be an integer in the range 1..8`,
+    );
+  }
+}
+
+export function assertTransparentIndex(
+  transparentIndex: unknown,
+  functionName: string,
+): void {
+  if (
+    typeof transparentIndex !== "number" ||
+    !Number.isInteger(transparentIndex) ||
+    transparentIndex > 255
+  ) {
+    throw new Error(
+      `${functionName}() expected transparentIndex to be an integer in the range 0..255 (negative values disable transparency)`,
+    );
+  }
+}
+
+export function assertDelay(delay: unknown, functionName: string): void {
+  if (
+    typeof delay !== "number" ||
+    !Number.isFinite(delay) ||
+    delay < 0 ||
+    Math.round(delay / 10) > 0xffff
+  ) {
+    throw new Error(
+      `${functionName}() expected delay to be a non-negative number of milliseconds up to 655350`,
+    );
+  }
+}
+
+export function assertRepeat(repeat: unknown, functionName: string): void {
+  if (
+    typeof repeat !== "number" ||
+    !Number.isInteger(repeat) ||
+    repeat < -1 ||
+    repeat > 0xffff
+  ) {
+    throw new Error(
+      `${functionName}() expected repeat to be an integer in the range -1..65535`,
+    );
+  }
+}
+
+export function assertDispose(dispose: unknown, functionName: string): void {
+  if (
+    typeof dispose !== "number" ||
+    !Number.isInteger(dispose) ||
+    dispose > 7
+  ) {
+    throw new Error(
+      `${functionName}() expected dispose to be an integer, negative for the encoder default or in the range 0..7`,
+    );
   }
 }

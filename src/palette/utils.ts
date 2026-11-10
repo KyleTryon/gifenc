@@ -1,7 +1,7 @@
 import type { Color, Palette, RGBAInput } from "../types.js";
 
 export function roundStep(byte: number, step: number): number {
-  return step > 1 ? Math.round(byte / step) * step : byte;
+  return step > 1 ? Math.min(255, Math.round(byte / step) * step) : byte;
 }
 
 export function uint32At(data: Uint32Array, index: number): number {
@@ -56,19 +56,6 @@ export function cloneColor(color: readonly number[]): Color {
   return color.length >= 4
     ? [red(color), green(color), blue(color), alpha(color)]
     : toRGB(color);
-}
-
-export function describeValue(value: unknown): string {
-  if (
-    value == null ||
-    typeof value === "string" ||
-    typeof value === "number" ||
-    typeof value === "boolean"
-  ) {
-    return String(value);
-  }
-
-  return Object.prototype.toString.call(value);
 }
 
 export function sqr(value: number): number {

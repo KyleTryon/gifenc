@@ -30,7 +30,7 @@ export function prequantize(
     let r = color & 0xff;
 
     a = roundStep(a, roundAlpha);
-    if (oneBitAlpha) {
+    if (oneBitAlpha !== null && oneBitAlpha !== false) {
       const threshold = typeof oneBitAlpha === "number" ? oneBitAlpha : 127;
       a = a <= threshold ? 0x00 : 0xff;
     }

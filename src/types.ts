@@ -267,7 +267,7 @@ export type ApplyPaletteOptions = {
   /**
    * Reverse every other dither row to reduce directional artifacts.
    *
-   * Defaults to `false`.
+   * Defaults to `true`.
    */
   serpentine?: boolean;
   /**
@@ -344,7 +344,8 @@ export type WriteFrameOptions = {
    */
   dispose?: number;
   /**
-   * GIF color resolution field.
+   * GIF color resolution and compression depth, an integer from `1` to `8`.
+   * Must accommodate every entry in the active palette.
    *
    * Defaults to `8`.
    */
@@ -429,7 +430,9 @@ export type GIFEncoderInstance = {
   /**
    * Encode one indexed frame.
    *
-   * `index` must contain exactly `width * height` palette indexes.
+   * Dimensions must be integers from `1` to `65535`; subsequent frames must
+   * fit within the first frame's logical screen. `index` must be a Uint8Array
+   * containing exactly `width * height` indexes into the active palette.
    */
   writeFrame: (
     index: ByteArray,
