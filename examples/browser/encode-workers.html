@@ -27,7 +27,11 @@
     <div id="progress"></div>
     <canvas></canvas>
     <script type="module">
-      import { assembleFrameChunks, quantize } from "/dist/gifenc.mjs";
+      import {
+        assembleFrameChunks,
+        frameDelay,
+        quantize,
+      } from "/dist/gifenc.mjs";
 
       const workerUrl = "/examples/browser/worker.js";
 
@@ -56,9 +60,6 @@
         const duration = 5;
         const totalFrames = Math.ceil(duration * fps);
 
-        const fpsInterval = 1 / fps;
-        const delay = fpsInterval * 1000;
-
         const render = sketch();
         const frames = new Array(totalFrames).fill(0).map((_, i) => i);
 
@@ -68,6 +69,7 @@
         const encoder = await createWorkerEncoder({
           totalFrames,
           fps,
+          duration,
           width,
           height,
           progress(v) {
@@ -110,6 +112,7 @@
           width,
           height,
           fps = 30,
+          duration,
           maxColors = 256,
           workerCount = 4,
           format = "rgb444",
@@ -126,9 +129,6 @@
 
         const frames = new Array(totalFrames).fill(null);
 
-        const fpsInterval = 1 / fps;
-        const delay = fpsInterval * 1000;
-
         let remaining = totalFrames;
         let workerIndex = 0;
 
@@ -137,7 +137,6 @@
           w.postMessage({
             event: "init",
             format,
-            delay,
             maxColors,
             width,
             height,
@@ -157,7 +156,18 @@
             if (frame === 0)
               globalPalette = quantize(data, maxColors, { format });
             if (!globalPalette) throw new Error("Add frame 0 first");
-            worker.postMessage([data, frame, globalPalette], [data.buffer]);
+            worker.postMessage(
+              [
+                data,
+                frame,
+                globalPalette,
+                frameDelay(
+                  (frame * 1000) / fps,
+                  Math.min(((frame + 1) * 1000) / fps, duration * 1000),
+                ),
+              ],
+              [data.buffer],
+            );
             frames[frame] = waitForFrame(worker, frame).then((ev) => {
               const [data, frame] = ev.data;
               nextProgress();

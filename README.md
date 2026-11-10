@@ -87,6 +87,45 @@ gif.finish();
 const bytes = gif.bytes();
 ```
 
+## Animation timing
+
+GIF delays have 10 ms resolution. Passing `1000 / fps` directly as each
+`writeFrame` delay rounds every frame independently and can accumulate drift.
+Use `frameDelay(startMs, endMs)` to round consecutive boundaries instead:
+
+```js
+import { frameDelay } from "@techsquidtv/gifenc";
+
+const fps = 12;
+const durationMs = 15000;
+const frameCount = Math.ceil((durationMs * fps) / 1000);
+for (let i = 0; i < frameCount; i++) {
+  const start = (i * 1000) / fps;
+  const end = Math.min(((i + 1) * 1000) / fps, durationMs);
+  gif.writeFrame(indexedFrames[i], width, height, {
+    palette: i === 0 ? palette : undefined,
+    delay: frameDelay(start, end),
+  });
+}
+```
+
+Use boundaries relative to one sequence origin; the final boundary can be the
+actual clip end, including a partial frame. With source timestamps, use each
+retained frame's timestamp and the next retained timestamp as its boundaries,
+then use the clip end for the last frame. If frames are skipped, this holds the
+preceding retained frame over the gap; intentionally removing time instead
+requires a new contiguous output timeline. Each interval and resulting delay
+must fit the encoder's per-frame limit (655350 ms); split longer holds into
+multiple frames. Zero delays can occur for short intervals, and viewers may
+clamp them or apply their own playback timing. The helper preserves total
+encoded duration to the nearest 10 ms, not necessarily actual viewer timing.
+
+For Cliparr, after a gifenc release containing this helper, replace the repeated
+`1000 / frameRate` delay with boundaries computed from output frame indices and
+the clip duration, or from retained frame timestamps as above. Keep a partial
+last frame and account for skipped frames according to the intended timeline.
+The low-level `writeFrame` delay contract remains unchanged.
+
 ## Dithering
 
 Use Floyd-Steinberg dithering when mapping RGBA pixels to a reduced palette. This
