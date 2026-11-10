@@ -1,5 +1,5 @@
 import constants from "./constants.js";
-import lzwEncode from "./lzw-encode.js";
+import lzwEncode, { LZW_HASH_SIZE, LZW_LARGE_HASH_SIZE } from "./lzw-encode.js";
 import createStream from "./stream.js";
 import {
   assertPalette,
@@ -39,10 +39,9 @@ export function GIFEncoder(opt: GIFEncoderOptions = {}): GIFEncoderInstance {
   const stream = createStream(initialCapacity);
 
   // Shared array data across all frames
-  const HSIZE = 5003; // 80% occupancy
   const accum = new Uint8Array(256);
-  const htab = new Int32Array(HSIZE);
-  const codetab = new Int32Array(HSIZE);
+  let htab = new Int32Array(LZW_HASH_SIZE);
+  let codetab = new Int32Array(LZW_HASH_SIZE);
 
   let hasInit = false;
   let globalPaletteLength = 0;
@@ -168,6 +167,16 @@ export function GIFEncoder(opt: GIFEncoderOptions = {}): GIFEncoderInstance {
 
       // All validation is done; from here on every write is unconditional so
       // a failing call leaves the stream untouched and the encoder usable.
+      // Large frames benefit from fewer hash probes; small frames avoid the
+      // allocation and clearing cost of the larger table.
+      if (
+        index.length >= 16384 &&
+        paletteLength > 16 &&
+        htab.length === LZW_HASH_SIZE
+      ) {
+        htab = new Int32Array(LZW_LARGE_HASH_SIZE);
+        codetab = new Int32Array(LZW_LARGE_HASH_SIZE);
+      }
       if (first && auto) {
         writeHeader();
         hasInit = true;

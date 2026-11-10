@@ -1,5 +1,5 @@
 import { assertRgbaByteLength } from "../rgba.js";
-import { nearestColorIndexRGB, nearestColorIndexRGBA } from "./nearest.js";
+import { createPaletteLookup } from "./lookup.js";
 import {
   commitTemporalDitherFrame,
   prepareTemporalDitherFrame,
@@ -69,6 +69,7 @@ export function applyPaletteDither(
 
   const hasAlpha = format === "rgba4444";
   const channels = temporalDitherChannels(format);
+  const nearest = createPaletteLookup(palette, hasAlpha);
   const temporalErrors = temporalDither
     ? prepareTemporalDitherFrame(
         temporalDither,
@@ -132,9 +133,7 @@ export function applyPaletteDither(
       const g = clampByte(pixels[pixelOffset + 1] ?? 0);
       const b = clampByte(pixels[pixelOffset + 2] ?? 0);
       const a = hasAlpha ? clampByte(pixels[pixelOffset + 3] ?? 0xff) : 0xff;
-      const paletteIndex = hasAlpha
-        ? nearestColorIndexRGBA(r, g, b, a, palette)
-        : nearestColorIndexRGB(r, g, b, palette);
+      const paletteIndex = nearest(r, g, b, a);
       const color = palette[paletteIndex];
       if (!color) {
         throw new Error(

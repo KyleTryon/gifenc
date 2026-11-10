@@ -24,7 +24,8 @@ import createStream from "./stream.js";
 import type { ByteArray, ByteStream, Int32Buffer } from "./types.js";
 
 const BITS = 12;
-const DEFAULT_HSIZE = 5003; // 80% occupancy
+export const LZW_HASH_SIZE = 5003;
+export const LZW_LARGE_HASH_SIZE = 32749;
 const MASKS = [
   0x0000, 0x0001, 0x0003, 0x0007, 0x000f, 0x001f, 0x003f, 0x007f, 0x00ff,
   0x01ff, 0x03ff, 0x07ff, 0x0fff, 0x1fff, 0x3fff, 0x7fff, 0xffff,
@@ -45,8 +46,8 @@ function lzwEncode(
   colorDepth: number,
   outStream: ByteStream = createStream(512),
   accum: ByteArray = new Uint8Array(256),
-  htab: Int32Buffer = new Int32Array(DEFAULT_HSIZE),
-  codetab: Int32Buffer = new Int32Array(DEFAULT_HSIZE),
+  htab: Int32Buffer = new Int32Array(LZW_HASH_SIZE),
+  codetab: Int32Buffer = new Int32Array(LZW_HASH_SIZE),
 ): ByteArray {
   if (pixels.length === 0) {
     throw new Error("lzwEncode() expected non-empty pixel data");

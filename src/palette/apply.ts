@@ -1,7 +1,7 @@
 import { assertRgbaInput, createUint32PixelView } from "../rgba.js";
 import { assertPalette, assertPaletteMatchesFormat } from "../validation.js";
 import { applyPaletteDither } from "./dither.js";
-import { nearestColorIndexRGB, nearestColorIndexRGBA } from "./nearest.js";
+import { createPaletteLookup } from "./lookup.js";
 import { normalizeApplyPaletteOptions } from "./options.js";
 import { uint32At } from "./utils.js";
 import type {
@@ -45,6 +45,7 @@ export function applyPalette(
   // Cache complete source colors so collisions cannot make a pixel's mapping
   // depend on the order in which other pixels were encountered.
   const cache = new Map<number, number>();
+  const nearest = createPaletteLookup(palette, format === "rgba4444");
 
   // Some duplicate code below due to very hot code path.
   // Introducing branching/conditions shows significant impact.
@@ -58,7 +59,7 @@ export function applyPalette(
       const key = color;
       let idx = cache.get(key);
       if (idx == null) {
-        idx = nearestColorIndexRGBA(r, g, b, a, palette);
+        idx = nearest(r, g, b, a);
         cache.set(key, idx);
       }
       index[i] = idx;
@@ -72,7 +73,7 @@ export function applyPalette(
       const key = color & 0xffffff;
       let idx = cache.get(key);
       if (idx == null) {
-        idx = nearestColorIndexRGB(r, g, b, palette);
+        idx = nearest(r, g, b);
         cache.set(key, idx);
       }
       index[i] = idx;
