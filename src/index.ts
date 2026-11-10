@@ -1,3 +1,4 @@
+export { encodeFrameChunk, assembleFrameChunks } from "./chunks.js";
 export { GIFEncoder, default } from "./encoder.js";
 export { default as quantize } from "./pnn-quant.js";
 export {
@@ -20,6 +21,8 @@ export type {
   DitherAlgorithm,
   DistanceFn,
   Format,
+  FrameChunk,
+  FrameChunkOptions,
   GIFEncoderInstance,
   GIFEncoderOptions,
   Int32Buffer,

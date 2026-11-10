@@ -467,3 +467,23 @@ export type GIFEncoderInstance = {
     opts?: WriteFrameOptions,
   ) => void;
 };
+
+/** Options for independently encoding a frame in an animation. */
+export type FrameChunkOptions = Omit<WriteFrameOptions, "first"> & {
+  /** Zero-based position in the complete animation. */
+  sequenceIndex: number;
+  /** Total number of frames in the animation. */
+  totalFrames: number;
+  /** Shared global palette, identical for every chunk. */
+  globalPalette: Palette;
+};
+
+/** Serializable result of {@link encodeFrameChunk}; treat as immutable. */
+export type FrameChunk = {
+  sequenceIndex: number;
+  totalFrames: number;
+  width: number;
+  height: number;
+  globalPalette: Palette;
+  bytes: ByteArray;
+};

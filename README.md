@@ -289,9 +289,19 @@ encoding can be split across frames.
 A common pattern:
 
 - Send RGBA frame data to workers.
-- In each worker, call `quantize`, `applyPalette`, and `GIFEncoder`.
+- Share the global palette with every worker; map pixels with `applyPalette`.
+- Call `encodeFrameChunk` with `sequenceIndex`, `totalFrames`, and `globalPalette`.
+  The first frame uses that palette; later frames may supply a local `palette`.
 - Return encoded frame chunks to the main thread.
-- Combine chunks into one final GIF stream.
+- Call `assembleFrameChunks(chunks)` once all frames arrive. It orders chunks and
+  rejects missing, duplicate, or inconsistent sequence and palette context.
+
+Chunks are serializable worker messages; transfer `chunk.bytes.buffer` and treat
+chunk metadata and bytes as immutable trusted output from `encodeFrameChunk`.
+For Cliparr Compact exports, after a gifenc release containing this API, pass
+the same global palette to every frame chunk and omit `palette` on later frames.
+Assemble the returned chunks instead of concatenating manual encoder streams.
+Per-frame palette exports can pass each later frame’s palette as `palette`.
 
 See the local worker example:
 
