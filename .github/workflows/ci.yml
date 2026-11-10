@@ -36,6 +36,9 @@ jobs:
       - run: pnpm run build
       - run: pnpm run test:package
       - run: pnpm run build:benchmark-pages
+      - name: Animation benchmark smoke test
+        if: matrix.node == '24'
+        run: GIFENC_ANIMATION_ITERATIONS=1 node bench/node/animation.mjs
 
   audit:
     name: Dependency audit
