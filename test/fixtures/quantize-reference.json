@@ -1,0 +1,415 @@
+{
+  "reference": "4245415772f8ba5557d1e06483d96e21e9044c17",
+  "seed": 123456789,
+  "pixelCount": 128,
+  "cases": [
+    {
+      "maxColors": 1,
+      "options": {
+        "format": "rgb444",
+        "useSqrt": true
+      },
+      "hash": "5d5a2b1dd1a553aa3b79b8283f05a4a804d9ff7493bc91e1cc207a9d393d886d"
+    },
+    {
+      "maxColors": 1,
+      "options": {
+        "format": "rgb444",
+        "useSqrt": false
+      },
+      "hash": "5d5a2b1dd1a553aa3b79b8283f05a4a804d9ff7493bc91e1cc207a9d393d886d"
+    },
+    {
+      "maxColors": 2,
+      "options": {
+        "format": "rgb444",
+        "useSqrt": true
+      },
+      "hash": "005625e9f2c163c69d794f5b36dd636f70123225374993b2d1bce5da3e4a63f8"
+    },
+    {
+      "maxColors": 2,
+      "options": {
+        "format": "rgb444",
+        "useSqrt": false
+      },
+      "hash": "005625e9f2c163c69d794f5b36dd636f70123225374993b2d1bce5da3e4a63f8"
+    },
+    {
+      "maxColors": 16,
+      "options": {
+        "format": "rgb444",
+        "useSqrt": true
+      },
+      "hash": "2e38b86fe34953cfbbab698ec0886710392125b07747d13a55d304672776e238"
+    },
+    {
+      "maxColors": 16,
+      "options": {
+        "format": "rgb444",
+        "useSqrt": false
+      },
+      "hash": "2e38b86fe34953cfbbab698ec0886710392125b07747d13a55d304672776e238"
+    },
+    {
+      "maxColors": 256,
+      "options": {
+        "format": "rgb444",
+        "useSqrt": true
+      },
+      "hash": "b84819b3f176a14e4b277af2f8d657bc23d358b964458f54072b23c8e0e04ab2"
+    },
+    {
+      "maxColors": 256,
+      "options": {
+        "format": "rgb444",
+        "useSqrt": false
+      },
+      "hash": "b84819b3f176a14e4b277af2f8d657bc23d358b964458f54072b23c8e0e04ab2"
+    },
+    {
+      "maxColors": 1,
+      "options": {
+        "format": "rgb565",
+        "useSqrt": true
+      },
+      "hash": "5d5a2b1dd1a553aa3b79b8283f05a4a804d9ff7493bc91e1cc207a9d393d886d"
+    },
+    {
+      "maxColors": 1,
+      "options": {
+        "format": "rgb565",
+        "useSqrt": false
+      },
+      "hash": "5d5a2b1dd1a553aa3b79b8283f05a4a804d9ff7493bc91e1cc207a9d393d886d"
+    },
+    {
+      "maxColors": 2,
+      "options": {
+        "format": "rgb565",
+        "useSqrt": true
+      },
+      "hash": "005625e9f2c163c69d794f5b36dd636f70123225374993b2d1bce5da3e4a63f8"
+    },
+    {
+      "maxColors": 2,
+      "options": {
+        "format": "rgb565",
+        "useSqrt": false
+      },
+      "hash": "005625e9f2c163c69d794f5b36dd636f70123225374993b2d1bce5da3e4a63f8"
+    },
+    {
+      "maxColors": 16,
+      "options": {
+        "format": "rgb565",
+        "useSqrt": true
+      },
+      "hash": "2e38b86fe34953cfbbab698ec0886710392125b07747d13a55d304672776e238"
+    },
+    {
+      "maxColors": 16,
+      "options": {
+        "format": "rgb565",
+        "useSqrt": false
+      },
+      "hash": "2e38b86fe34953cfbbab698ec0886710392125b07747d13a55d304672776e238"
+    },
+    {
+      "maxColors": 256,
+      "options": {
+        "format": "rgb565",
+        "useSqrt": true
+      },
+      "hash": "55a9053fbb2968aeda4d265e52996c2e0a6bea16905fa2cabdcf45194e632666"
+    },
+    {
+      "maxColors": 256,
+      "options": {
+        "format": "rgb565",
+        "useSqrt": false
+      },
+      "hash": "55a9053fbb2968aeda4d265e52996c2e0a6bea16905fa2cabdcf45194e632666"
+    },
+    {
+      "maxColors": 1,
+      "options": {
+        "format": "rgba4444",
+        "useSqrt": true
+      },
+      "hash": "c62d80d4523c89ec775ef96b3918810293295f9139d28e82dde39e2c7513cdda"
+    },
+    {
+      "maxColors": 1,
+      "options": {
+        "format": "rgba4444",
+        "useSqrt": true,
+        "oneBitAlpha": true
+      },
+      "hash": "76f69e334fea84a393fc338f6fda5e997bfdaa10e0a6d0949f6b86bf1c26a53e"
+    },
+    {
+      "maxColors": 1,
+      "options": {
+        "format": "rgba4444",
+        "useSqrt": true,
+        "oneBitAlpha": 0
+      },
+      "hash": "5a2115cde28338dfc40d62d6d27cc6bc8018100e7098ada601226eccb42e284a"
+    },
+    {
+      "maxColors": 1,
+      "options": {
+        "format": "rgba4444",
+        "useSqrt": true,
+        "clearAlpha": false
+      },
+      "hash": "c62d80d4523c89ec775ef96b3918810293295f9139d28e82dde39e2c7513cdda"
+    },
+    {
+      "maxColors": 1,
+      "options": {
+        "format": "rgba4444",
+        "useSqrt": false
+      },
+      "hash": "c62d80d4523c89ec775ef96b3918810293295f9139d28e82dde39e2c7513cdda"
+    },
+    {
+      "maxColors": 1,
+      "options": {
+        "format": "rgba4444",
+        "useSqrt": false,
+        "oneBitAlpha": true
+      },
+      "hash": "76f69e334fea84a393fc338f6fda5e997bfdaa10e0a6d0949f6b86bf1c26a53e"
+    },
+    {
+      "maxColors": 1,
+      "options": {
+        "format": "rgba4444",
+        "useSqrt": false,
+        "oneBitAlpha": 0
+      },
+      "hash": "5a2115cde28338dfc40d62d6d27cc6bc8018100e7098ada601226eccb42e284a"
+    },
+    {
+      "maxColors": 1,
+      "options": {
+        "format": "rgba4444",
+        "useSqrt": false,
+        "clearAlpha": false
+      },
+      "hash": "c62d80d4523c89ec775ef96b3918810293295f9139d28e82dde39e2c7513cdda"
+    },
+    {
+      "maxColors": 2,
+      "options": {
+        "format": "rgba4444",
+        "useSqrt": true
+      },
+      "hash": "e82ad9eecb1cb928fba516064325e0332b33f2015a6128471e136377ba85100a"
+    },
+    {
+      "maxColors": 2,
+      "options": {
+        "format": "rgba4444",
+        "useSqrt": true,
+        "oneBitAlpha": true
+      },
+      "hash": "7902a39fc18a97348b68b2c012544d4a3743a78c4864cf674178fc43716378a0"
+    },
+    {
+      "maxColors": 2,
+      "options": {
+        "format": "rgba4444",
+        "useSqrt": true,
+        "oneBitAlpha": 0
+      },
+      "hash": "05e1c7bb839590cc7620e5ba672ee8c0c20d966dc961002b0fa1bad9bb0a3971"
+    },
+    {
+      "maxColors": 2,
+      "options": {
+        "format": "rgba4444",
+        "useSqrt": true,
+        "clearAlpha": false
+      },
+      "hash": "e82ad9eecb1cb928fba516064325e0332b33f2015a6128471e136377ba85100a"
+    },
+    {
+      "maxColors": 2,
+      "options": {
+        "format": "rgba4444",
+        "useSqrt": false
+      },
+      "hash": "e82ad9eecb1cb928fba516064325e0332b33f2015a6128471e136377ba85100a"
+    },
+    {
+      "maxColors": 2,
+      "options": {
+        "format": "rgba4444",
+        "useSqrt": false,
+        "oneBitAlpha": true
+      },
+      "hash": "7902a39fc18a97348b68b2c012544d4a3743a78c4864cf674178fc43716378a0"
+    },
+    {
+      "maxColors": 2,
+      "options": {
+        "format": "rgba4444",
+        "useSqrt": false,
+        "oneBitAlpha": 0
+      },
+      "hash": "05e1c7bb839590cc7620e5ba672ee8c0c20d966dc961002b0fa1bad9bb0a3971"
+    },
+    {
+      "maxColors": 2,
+      "options": {
+        "format": "rgba4444",
+        "useSqrt": false,
+        "clearAlpha": false
+      },
+      "hash": "e82ad9eecb1cb928fba516064325e0332b33f2015a6128471e136377ba85100a"
+    },
+    {
+      "maxColors": 16,
+      "options": {
+        "format": "rgba4444",
+        "useSqrt": true
+      },
+      "hash": "f47553a238fac12e5893f43ce3812b044350945967c0811cab3b85e10a8f8dfd"
+    },
+    {
+      "maxColors": 16,
+      "options": {
+        "format": "rgba4444",
+        "useSqrt": true,
+        "oneBitAlpha": true
+      },
+      "hash": "1ce5e86a8c3b55d015f157054f67eea73456f041659462ef473d413c8201e8fc"
+    },
+    {
+      "maxColors": 16,
+      "options": {
+        "format": "rgba4444",
+        "useSqrt": true,
+        "oneBitAlpha": 0
+      },
+      "hash": "9d5cf8b391fcf67c31aa7c8bd28d7297a6e239059229b17b26251f55613c751b"
+    },
+    {
+      "maxColors": 16,
+      "options": {
+        "format": "rgba4444",
+        "useSqrt": true,
+        "clearAlpha": false
+      },
+      "hash": "f47553a238fac12e5893f43ce3812b044350945967c0811cab3b85e10a8f8dfd"
+    },
+    {
+      "maxColors": 16,
+      "options": {
+        "format": "rgba4444",
+        "useSqrt": false
+      },
+      "hash": "f47553a238fac12e5893f43ce3812b044350945967c0811cab3b85e10a8f8dfd"
+    },
+    {
+      "maxColors": 16,
+      "options": {
+        "format": "rgba4444",
+        "useSqrt": false,
+        "oneBitAlpha": true
+      },
+      "hash": "1ce5e86a8c3b55d015f157054f67eea73456f041659462ef473d413c8201e8fc"
+    },
+    {
+      "maxColors": 16,
+      "options": {
+        "format": "rgba4444",
+        "useSqrt": false,
+        "oneBitAlpha": 0
+      },
+      "hash": "9d5cf8b391fcf67c31aa7c8bd28d7297a6e239059229b17b26251f55613c751b"
+    },
+    {
+      "maxColors": 16,
+      "options": {
+        "format": "rgba4444",
+        "useSqrt": false,
+        "clearAlpha": false
+      },
+      "hash": "f47553a238fac12e5893f43ce3812b044350945967c0811cab3b85e10a8f8dfd"
+    },
+    {
+      "maxColors": 256,
+      "options": {
+        "format": "rgba4444",
+        "useSqrt": true
+      },
+      "hash": "a37e26e7e4a73e9e777deaf5cfcc4103f49dc77701b3b4da8edeec13ffbe1d7f"
+    },
+    {
+      "maxColors": 256,
+      "options": {
+        "format": "rgba4444",
+        "useSqrt": true,
+        "oneBitAlpha": true
+      },
+      "hash": "15ce657204368c5df7588f2efd3aba0f83ca79cbaa29e1f61b98a2f4a93d8bdb"
+    },
+    {
+      "maxColors": 256,
+      "options": {
+        "format": "rgba4444",
+        "useSqrt": true,
+        "oneBitAlpha": 0
+      },
+      "hash": "b95eb1c84c7e1fd67f858b2343c979d9df0627aa7b4cf43decec0c649e3cce7d"
+    },
+    {
+      "maxColors": 256,
+      "options": {
+        "format": "rgba4444",
+        "useSqrt": true,
+        "clearAlpha": false
+      },
+      "hash": "a37e26e7e4a73e9e777deaf5cfcc4103f49dc77701b3b4da8edeec13ffbe1d7f"
+    },
+    {
+      "maxColors": 256,
+      "options": {
+        "format": "rgba4444",
+        "useSqrt": false
+      },
+      "hash": "a37e26e7e4a73e9e777deaf5cfcc4103f49dc77701b3b4da8edeec13ffbe1d7f"
+    },
+    {
+      "maxColors": 256,
+      "options": {
+        "format": "rgba4444",
+        "useSqrt": false,
+        "oneBitAlpha": true
+      },
+      "hash": "15ce657204368c5df7588f2efd3aba0f83ca79cbaa29e1f61b98a2f4a93d8bdb"
+    },
+    {
+      "maxColors": 256,
+      "options": {
+        "format": "rgba4444",
+        "useSqrt": false,
+        "oneBitAlpha": 0
+      },
+      "hash": "b95eb1c84c7e1fd67f858b2343c979d9df0627aa7b4cf43decec0c649e3cce7d"
+    },
+    {
+      "maxColors": 256,
+      "options": {
+        "format": "rgba4444",
+        "useSqrt": false,
+        "clearAlpha": false
+      },
+      "hash": "a37e26e7e4a73e9e777deaf5cfcc4103f49dc77701b3b4da8edeec13ffbe1d7f"
+    }
+  ]
+}
