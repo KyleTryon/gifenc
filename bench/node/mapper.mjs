@@ -76,7 +76,7 @@ for (const [name, frames] of [
     ),
   ];
   console.log(
-    `\n${name}: ${frames.length} changing ${width}x${height} frames, 64-color shared palette`,
+    `\n${name}: ${frames.length} changing ${width}x${height} frames, ${palette.length}-color shared palette`,
   );
   for (const [label, run] of cases) {
     // First pass includes cold caches; following passes show repeated sequence behavior.
