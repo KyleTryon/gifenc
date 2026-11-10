@@ -253,9 +253,8 @@ The low-level `stream.writeBytes(data, offset, byteLength)` and
 `stream.writeBytesView(data, offset, byteLength)` methods default `byteLength` to
 the remaining source after `offset`. Offsets and lengths must be nonnegative
 integers within the source; invalid ranges throw `RangeError` before writing.
-**Migration:** callers relying on an omitted length to mean the entire source
-must specify a valid length or adjust the offset. Calls that previously relied
-on truncated or partially written out-of-bounds ranges must use valid ranges.
+Calls that previously passed out-of-bounds ranges must use valid ranges; they
+now throw instead of truncating, appending unwritten bytes, or partially writing.
 
 Frame options include:
 
