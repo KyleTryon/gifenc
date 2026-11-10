@@ -49,13 +49,7 @@ export function GIFEncoder(opt: GIFEncoderOptions = {}): GIFEncoderInstance {
   let screenHeight = 0;
 
   return {
-    reset() {
-      stream.reset();
-      hasInit = false;
-      globalPaletteLength = 0;
-      screenWidth = 0;
-      screenHeight = 0;
-    },
+    reset,
     finish() {
       stream.writeByte(constants.trailer);
     },
@@ -64,6 +58,11 @@ export function GIFEncoder(opt: GIFEncoderOptions = {}): GIFEncoderInstance {
     },
     bytesView() {
       return stream.bytesView();
+    },
+    takeBytes() {
+      const result = stream.takeBytes();
+      reset();
+      return result;
     },
     get buffer() {
       return stream.buffer;
@@ -216,6 +215,14 @@ export function GIFEncoder(opt: GIFEncoderOptions = {}): GIFEncoderInstance {
 
   function writeHeader(): void {
     writeUTFBytes(stream, "GIF89a");
+  }
+
+  function reset(): void {
+    stream.reset();
+    hasInit = false;
+    globalPaletteLength = 0;
+    screenWidth = 0;
+    screenHeight = 0;
   }
 }
 

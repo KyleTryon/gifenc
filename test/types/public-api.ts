@@ -75,6 +75,11 @@ applyPalette(rgbaData, palette, {
 temporalDither.reset();
 const normalizedChangeDetection = temporalDither.changeDetection;
 GIFEncoder().writeFrame(indexed, 1, 1, { palette: [rgb] });
+const transferableOutput: Uint8Array<ArrayBuffer> = GIFEncoder().takeBytes();
+const transferableStreamOutput: Uint8Array<ArrayBuffer> =
+  GIFEncoder().stream.takeBytes();
+void transferableOutput;
+void transferableStreamOutput;
 
 const nearestIndex: number = nearestColorIndex(palette, rgb);
 const nearestWithDistance: [number, number] = nearestColorIndexWithDistance(
