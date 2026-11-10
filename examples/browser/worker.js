@@ -11,17 +11,10 @@ self.addEventListener("message", (ev) => {
     self.postMessage("ready");
   } else {
     // Get the options for the encoder
-    const {
-      format = "rgb444",
-      width,
-      height,
-      maxColors = 256,
-      repeat = 0,
-      delay = 0,
-    } = options;
+    const { format = "rgb444", width, height, maxColors = 256 } = options;
 
     // Get the data + index for this frame
-    const [data, frame] = detail;
+    const [data, frame, delay] = detail;
 
     // Get palette from this frame
     const palette = quantize(data, maxColors, { format });

@@ -22,7 +22,12 @@
     </p>
     <canvas></canvas>
     <script type="module">
-      import { GIFEncoder, quantize, applyPalette } from "/dist/gifenc.mjs";
+      import {
+        GIFEncoder,
+        quantize,
+        applyPalette,
+        frameDelay,
+      } from "/dist/gifenc.mjs";
 
       encode();
 
@@ -48,9 +53,6 @@
         const fps = 30;
         const duration = 5;
         const totalFrames = Math.ceil(duration * fps);
-
-        const fpsInterval = 1 / fps;
-        const delay = fpsInterval * 1000;
 
         const render = sketch();
         const frames = new Array(totalFrames).fill(0).map((_, i) => i);
@@ -81,7 +83,13 @@
           const index = applyPalette(data, palette, format);
 
           // Write frame into GIF
-          gif.writeFrame(index, width, height, { palette, delay });
+          gif.writeFrame(index, width, height, {
+            palette,
+            delay: frameDelay(
+              (i * 1000) / fps,
+              Math.min(((i + 1) * 1000) / fps, duration * 1000),
+            ),
+          });
 
           // Wait a tick so that we don't lock up browser
           await new Promise((resolve) => setTimeout(resolve, 0));

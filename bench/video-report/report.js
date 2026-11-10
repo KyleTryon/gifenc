@@ -2,6 +2,7 @@ import {
   GIFEncoder,
   applyPalette,
   createTemporalDither,
+  frameDelay,
   quantize,
 } from "../../dist/gifenc.mjs";
 import { BENCH_VIDEO_FIXTURES, fixtureUrl } from "../../fixtures/index.js";
@@ -341,7 +342,6 @@ async function encodeVariant(metadata, frames, variant, onProgress) {
       : null;
   const skyDiagnostics = createSkyDiagnostics(width, height);
   const encoder = GIFEncoder();
-  const delay = 1000 / variant.fps;
 
   for (let i = 0; i < selectedFrames.length; i++) {
     const rgba = selectedFrames[i];
@@ -368,7 +368,10 @@ async function encodeVariant(metadata, frames, variant, onProgress) {
     recordSkyDiagnostics(skyDiagnostics, rgba, palette, index);
 
     encoder.writeFrame(index, width, height, {
-      delay,
+      delay: frameDelay(
+        (i * 1000) / variant.fps,
+        ((i + 1) * 1000) / variant.fps,
+      ),
       palette:
         variant.paletteStrategy === "shared" && i > 0 ? undefined : palette,
     });
