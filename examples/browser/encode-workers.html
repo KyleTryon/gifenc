@@ -27,7 +27,7 @@
     <div id="progress"></div>
     <canvas></canvas>
     <script type="module">
-      import { GIFEncoder, quantize, applyPalette } from "/dist/gifenc.mjs";
+      import { GIFEncoder, frameDelay } from "/dist/gifenc.mjs";
 
       const workerUrl = "/examples/browser/worker.js";
 
@@ -56,9 +56,6 @@
         const duration = 5;
         const totalFrames = Math.ceil(duration * fps);
 
-        const fpsInterval = 1 / fps;
-        const delay = fpsInterval * 1000;
-
         const render = sketch();
         const frames = new Array(totalFrames).fill(0).map((_, i) => i);
 
@@ -68,6 +65,7 @@
         const encoder = await createWorkerEncoder({
           totalFrames,
           fps,
+          duration,
           width,
           height,
           progress(v) {
@@ -110,6 +108,7 @@
           width,
           height,
           fps = 30,
+          duration,
           maxColors = 256,
           workerCount = 4,
           format = "rgb444",
@@ -126,9 +125,6 @@
 
         const frames = new Array(totalFrames).fill(null);
 
-        const fpsInterval = 1 / fps;
-        const delay = fpsInterval * 1000;
-
         let remaining = totalFrames;
         let workerIndex = 0;
 
@@ -137,7 +133,6 @@
           w.postMessage({
             event: "init",
             repeat: 0,
-            delay,
             maxColors,
             width,
             height,
@@ -154,7 +149,17 @@
             // We cycle through all workers uniformly
             const worker = workers[workerIndex++ % workers.length];
             // Send data to worker
-            worker.postMessage([data, frame], [data.buffer]);
+            worker.postMessage(
+              [
+                data,
+                frame,
+                frameDelay(
+                  (frame * 1000) / fps,
+                  Math.min(((frame + 1) * 1000) / fps, duration * 1000),
+                ),
+              ],
+              [data.buffer],
+            );
             frames[frame] = waitForFrame(worker, frame).then((ev) => {
               const [data, frame] = ev.data;
               nextProgress();
