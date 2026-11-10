@@ -37,6 +37,7 @@ import {
   quantize,
   applyPalette,
   createTemporalDither,
+  createTemporalDitherSequence,
 } from "@techsquidtv/gifenc";
 ```
 
@@ -48,6 +49,7 @@ import {
   quantize,
   applyPalette,
   createTemporalDither,
+  createTemporalDitherSequence,
 } from "https://unpkg.com/@techsquidtv/gifenc/dist/gifenc.mjs";
 ```
 
@@ -214,6 +216,45 @@ cache is cleared before inserting another color, bounding memory across long
 animations. Call `reset()` to release cached entries while keeping the snapshot.
 Cache eviction and reset affect speed only. Larger limits can improve repeated
 high-color frames at the cost of retained memory.
+
+### `createTemporalDitherSequence()`
+
+Manages one ordered animation at a time using the same state as
+`createTemporalDither`. Start each animation with its dimensions and settings:
+
+```js
+const sequence = createTemporalDitherSequence();
+const temporalDither = sequence.start({ width, height, format });
+try {
+  for (const frame of frames) {
+    const index = applyPalette(frame.data, palette, {
+      width,
+      height,
+      format,
+      temporalDither,
+    });
+    gif.writeFrame(index, width, height, { palette, delay });
+  }
+} finally {
+  sequence.end();
+}
+```
+
+Process frames sequentially in display order, with one frame in flight. Use a
+separate sequence for each concurrent animation. Call `reset()` at a known cut;
+it requires an active sequence. `end()` clears and releases the active state and
+is safe to repeat. Call `start()` again for a new animation or when dimensions,
+format, or temporal settings change. Starting successfully clears the previous
+state; invalid options leave it active. Do not use a state returned by an earlier
+`start()` after replacement or `end()`: retained references cannot be revoked.
+The direct `createTemporalDither()` API remains available.
+
+For Cliparr, create a sequence per encoding job, start it once using the job's
+resolved dimensions, format and temporal settings, pass the returned state to
+ordered frame mappings, and end it in a `finally` block. Keep spatial-temporal
+jobs on one worker with one frame in flight. Remove the settings-key cache and
+restart the sequence if those settings change. This requires a gifenc release
+containing this API before upgrading Cliparr.
 
 ### `createTemporalDither(options)`
 

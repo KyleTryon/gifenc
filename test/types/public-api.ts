@@ -3,6 +3,7 @@ import {
   applyPalette,
   createPaletteMapper,
   createTemporalDither,
+  createTemporalDitherSequence,
   nearestColorIndex,
   nearestColorIndexWithDistance,
   quantize,
@@ -15,6 +16,7 @@ import {
   type RGBA,
   type TemporalDitherChangeDetectionOptions,
   type TemporalDitherOptions,
+  type TemporalDitherSequence,
   type TemporalDitherState,
 } from "../../src/index.js";
 
@@ -57,6 +59,12 @@ const changeDetection: TemporalDitherChangeDetectionOptions = {
 };
 const temporalDither: TemporalDitherState =
   createTemporalDither(temporalOptions);
+
+const sequence: TemporalDitherSequence = createTemporalDitherSequence();
+const sequenceState: TemporalDitherState = sequence.start(temporalOptions);
+sequence.reset();
+sequence.end();
+applyPalette(rgbaData, quantized, { temporalDither: sequenceState });
 
 applyPalette(rgbaData, quantized, paletteOptions);
 createTemporalDither({

@@ -192,6 +192,16 @@ export type TemporalDitherOptions = {
   changeDetection?: boolean | TemporalDitherChangeDetectionOptions;
 };
 
+/** Explicit lifecycle for one ordered temporal dithering sequence at a time. */
+export type TemporalDitherSequence = {
+  /** Start a fresh animation, replacing any active state. */
+  start(options: TemporalDitherOptions): TemporalDitherState;
+  /** Clear the active animation's history at a known boundary. */
+  reset(): void;
+  /** Clear and release the active state. */
+  end(): void;
+};
+
 /**
  * Resettable per-animation state used for temporal dithering.
  */
