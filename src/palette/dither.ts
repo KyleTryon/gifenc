@@ -69,7 +69,8 @@ export function applyPaletteDither(
       )
     : null;
   const rowLength = resolvedWidth * channels;
-  const pixels = acquireScratch(rowLength * Math.min(2, resolvedHeight));
+  const diffusionLength = rowLength * Math.min(2, resolvedHeight);
+  const pixels = acquireScratch(diffusionLength * (temporalErrors ? 2 : 1));
   const index = new Uint8Array(length);
   const temporalStrength = temporalDither?.strength ?? 0;
 
@@ -101,6 +102,13 @@ export function applyPaletteDither(
             ? (temporalErrors[errorOffset + 3] ?? 0) * temporalStrength
             : 0);
     }
+    if (temporalErrors) {
+      pixels.copyWithin(
+        diffusionLength + rowOffset,
+        rowOffset,
+        rowOffset + rowLength,
+      );
+    }
   };
 
   initializeRow(0);
@@ -111,11 +119,12 @@ export function applyPaletteDither(
     const xStart = reverse ? resolvedWidth - 1 : 0;
     const xEnd = reverse ? -1 : resolvedWidth;
     const step = reverse ? -1 : 1;
+    const rowOffset = (y % 2) * rowLength;
 
     for (let x = xStart; x !== xEnd; x += step) {
       const idx = y * resolvedWidth + x;
       const pixelOffset = idx * channels;
-      const scratchOffset = (y % 2) * rowLength + x * channels;
+      const scratchOffset = rowOffset + x * channels;
       const r = clampByte(pixels[scratchOffset] ?? 0);
       const g = clampByte(pixels[scratchOffset + 1] ?? 0);
       const b = clampByte(pixels[scratchOffset + 2] ?? 0);
@@ -135,34 +144,14 @@ export function applyPaletteDither(
       const ea = hasAlpha ? a - alpha(color) : 0;
 
       if (temporalDither && temporalErrors) {
-        // Match the Float32 rounding of the original source buffer before
-        // clamping; spatial diffusion must not enter temporal history.
-        const sourceOffset = idx * 4;
-        const tr = clampByte(
-          Math.fround(
-            byteAt(rgba, sourceOffset) +
-              (temporalErrors[pixelOffset] ?? 0) * temporalStrength,
-          ),
-        );
-        const tg = clampByte(
-          Math.fround(
-            byteAt(rgba, sourceOffset + 1) +
-              (temporalErrors[pixelOffset + 1] ?? 0) * temporalStrength,
-          ),
-        );
-        const tb = clampByte(
-          Math.fround(
-            byteAt(rgba, sourceOffset + 2) +
-              (temporalErrors[pixelOffset + 2] ?? 0) * temporalStrength,
-          ),
-        );
+        // The initialized Float32 values exclude spatial diffusion, as required
+        // for temporal history. Keep just two rows alongside the diffusion rows.
+        const originalOffset = diffusionLength + scratchOffset;
+        const tr = clampByte(pixels[originalOffset] ?? 0);
+        const tg = clampByte(pixels[originalOffset + 1] ?? 0);
+        const tb = clampByte(pixels[originalOffset + 2] ?? 0);
         const ta = hasAlpha
-          ? clampByte(
-              Math.fround(
-                byteAt(rgba, sourceOffset + 3) +
-                  (temporalErrors[pixelOffset + 3] ?? 0) * temporalStrength,
-              ),
-            )
+          ? clampByte(pixels[originalOffset + 3] ?? 0xff)
           : 0xff;
         storeTemporalError(
           temporalErrors,
@@ -181,9 +170,9 @@ export function applyPaletteDither(
           pixels,
           channels,
           resolvedWidth,
-          resolvedHeight,
           x,
-          y,
+          rowOffset,
+          y + 1 < resolvedHeight ? rowLength - rowOffset : -1,
           reverse,
           ditherStrength,
           er,
@@ -238,9 +227,9 @@ function diffuseError(
   pixels: Float32Array,
   channels: number,
   width: number,
-  height: number,
   x: number,
-  y: number,
+  rowOffset: number,
+  nextRowOffset: number,
   reverse: boolean,
   strength: number,
   er: number,
@@ -253,22 +242,21 @@ function diffuseError(
     pixels,
     channels,
     width,
-    height,
     x + direction,
-    y,
+    rowOffset,
     er,
     eg,
     eb,
     ea,
     (strength * 7) / 16,
   );
+  if (nextRowOffset < 0) return;
   addError(
     pixels,
     channels,
     width,
-    height,
     x - direction,
-    y + 1,
+    nextRowOffset,
     er,
     eg,
     eb,
@@ -279,9 +267,8 @@ function diffuseError(
     pixels,
     channels,
     width,
-    height,
     x,
-    y + 1,
+    nextRowOffset,
     er,
     eg,
     eb,
@@ -292,9 +279,8 @@ function diffuseError(
     pixels,
     channels,
     width,
-    height,
     x + direction,
-    y + 1,
+    nextRowOffset,
     er,
     eg,
     eb,
@@ -307,17 +293,16 @@ function addError(
   pixels: Float32Array,
   channels: number,
   width: number,
-  height: number,
   x: number,
-  y: number,
+  rowOffset: number,
   er: number,
   eg: number,
   eb: number,
   ea: number,
   amount: number,
 ): void {
-  if (x < 0 || x >= width || y < 0 || y >= height) return;
-  const idx = ((y % 2) * width + x) * channels;
+  if (x < 0 || x >= width) return;
+  const idx = rowOffset + x * channels;
   pixels[idx] = (pixels[idx] ?? 0) + er * amount;
   pixels[idx + 1] = (pixels[idx + 1] ?? 0) + eg * amount;
   pixels[idx + 2] = (pixels[idx + 2] ?? 0) + eb * amount;
