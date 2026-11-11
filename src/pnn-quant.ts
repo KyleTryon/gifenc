@@ -36,6 +36,12 @@ type BinList = {
   tm: Int32Array;
   mtm: Int32Array;
   err: Float64Array;
+  /**
+   * Lower bound of each bin's leading channel (red, or alpha for rgba4444),
+   * taken from its sorted histogram key. Bins only absorb later bins, so a
+   * bin's mean never drops below this bound.
+   */
+  lo: Float64Array;
 };
 
 const DELETED_BIN = 0x7fffffff;
@@ -64,29 +70,39 @@ function find_nn(bins: BinList, idx: number, hasAlpha: boolean): void {
   let nn = 0;
   let err = 1e100;
 
-  const n1 = bins.cnt[idx] ?? 0;
-  const wa = bins.ac[idx] ?? 0;
-  const wr = bins.rc[idx] ?? 0;
-  const wg = bins.gc[idx] ?? 0;
-  const wb = bins.bc[idx] ?? 0;
-  for (let i = bins.fw[idx] ?? 0; i !== 0; i = bins.fw[i] ?? 0) {
-    const n2 = bins.cnt[i] ?? 0;
+  const { cnt, ac, rc, gc, bc, fw, lo } = bins;
+  const n1 = cnt[idx] ?? 0;
+  const wa = hasAlpha ? (ac[idx] ?? 0) : 0;
+  const wr = rc[idx] ?? 0;
+  const wg = gc[idx] ?? 0;
+  const wb = bc[idx] ?? 0;
+  const lead = hasAlpha ? wa : wr;
+  // Every later bin has a count of at least 1, so its merge weight is at least
+  // n1 / (n1 + 1). Later bins' leading-channel bounds never decrease, so once
+  // that bound alone exceeds the best error, no later bin can win. The small
+  // slack keeps rounding from pruning a bin the full test would accept.
+  const minWeight = (n1 / (n1 + 1)) * (1 - 1e-9);
+  for (let i = fw[idx] ?? 0; i !== 0; i = fw[i] ?? 0) {
+    const gap = (lo[i] ?? 0) - lead;
+    if (gap > 0 && minWeight * gap * gap > err) break;
+
+    const n2 = cnt[i] ?? 0;
     const nerr2 = (n1 * n2) / (n1 + n2);
     if (nerr2 >= err) continue;
 
     let nerr = 0;
     if (hasAlpha) {
-      nerr += nerr2 * sqr((bins.ac[i] ?? 0) - wa);
+      nerr += nerr2 * sqr((ac[i] ?? 0) - wa);
       if (nerr >= err) continue;
     }
 
-    nerr += nerr2 * sqr((bins.rc[i] ?? 0) - wr);
+    nerr += nerr2 * sqr((rc[i] ?? 0) - wr);
     if (nerr >= err) continue;
 
-    nerr += nerr2 * sqr((bins.gc[i] ?? 0) - wg);
+    nerr += nerr2 * sqr((gc[i] ?? 0) - wg);
     if (nerr >= err) continue;
 
-    nerr += nerr2 * sqr((bins.bc[i] ?? 0) - wb);
+    nerr += nerr2 * sqr((bc[i] ?? 0) - wb);
     if (nerr >= err) continue;
     err = nerr;
     nn = i;
@@ -166,8 +182,14 @@ function createBinList(data: Uint32Array, format: Format): BinList {
   // sparse ones are trimmed so a tiny palette does not retain large arrays.
   const occupied = touched.subarray(0, touchedLength);
   occupied.sort();
+  // The key's top bits are red >> 3 (rgb565), red >> 4 (rgb444), or
+  // alpha >> 4 (rgba4444), giving a lower bound on that channel.
+  const leadShift = format === "rgb565" ? 11 : format === "rgb444" ? 8 : 12;
+  const leadScale = format === "rgb565" ? 8 : 16;
+  const lo = new Float64Array(touchedLength);
   for (let i = 0; i < touchedLength; i++) {
     const key = occupied[i] ?? 0;
+    lo[i] = (key >> leadShift) * leadScale;
     if (hasAlpha) ac[i] = ac[key] ?? 0;
     rc[i] = rc[key] ?? 0;
     gc[i] = gc[key] ?? 0;
@@ -192,6 +214,7 @@ function createBinList(data: Uint32Array, format: Format): BinList {
     tm: new Int32Array(touchedLength),
     mtm: new Int32Array(touchedLength),
     err: new Float64Array(touchedLength),
+    lo,
   };
 }
 
