@@ -328,6 +328,13 @@ rules; resetting an encoder does not supply a prior chunk's global palette.
 For final assembly, an owned view can likewise be passed to `Blob` directly;
 Blob construction may itself copy according to the platform.
 
+The low-level `stream.writeBytes(data, offset, byteLength)` and
+`stream.writeBytesView(data, offset, byteLength)` methods default `byteLength` to
+the remaining source after `offset`. Offsets and lengths must be nonnegative
+integers within the source; invalid ranges throw `RangeError` before writing.
+Calls that previously passed out-of-bounds ranges must use valid ranges; they
+now throw instead of truncating, appending unwritten bytes, or partially writing.
+
 Frame options include:
 
 - `palette`: color table for the frame.
