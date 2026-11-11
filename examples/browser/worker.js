@@ -13,7 +13,6 @@ self.addEventListener("message", (ev) => {
     // Get the options for the encoder
     const { format = "rgb444", width, height, maxColors = 256 } = options;
 
-    // Get the data + index for this frame
     const [data, frame, globalPalette, delay] = detail;
 
     // Get palette from this frame

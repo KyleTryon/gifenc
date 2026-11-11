@@ -50,6 +50,7 @@
     "eslint": "^10.14.0",
     "knip": "^6.44.2",
     "omggif": "^1.0.10",
+    "playwright": "^1.65.0",
     "pngjs": "^7.0.0",
     "prettier": "^3.9.10",
     "typescript": "^6.0.3",
@@ -78,7 +79,8 @@
     "build:types": "tsc -p tsconfig.types.json",
     "serve": "node scripts/serve.mjs",
     "dist:cjs": "pnpm run build:cjs",
-    "knip": "knip"
+    "knip": "knip",
+    "test:browser": "pnpm run build:esm && node test/browser/smoke.mjs"
   },
   "keywords": [
     "gif",
