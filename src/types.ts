@@ -16,6 +16,8 @@ export type DitherAlgorithm = "floyd-steinberg";
  */
 export type ByteArray = Uint8Array;
 
+type TransferableByteArray = ByteArray & { readonly buffer: ArrayBuffer };
+
 /**
  * Browser canvas-compatible RGBA byte buffer.
  */
@@ -107,6 +109,14 @@ export type QuantizeOptions = {
   useSqrt?: boolean;
 };
 
+/** Bounded sample accumulator for a palette shared across selected frames. */
+export type PaletteSampler = {
+  /** Add RGBA pixels, or skip a missing frame. Returns the number sampled. */
+  addFrame(rgba: RGBAInput | null | undefined): number;
+  /** Quantize accumulated pixels; returns an empty palette when none were added. */
+  quantize(maxColors: number, options?: QuantizeOptions): Palette;
+};
+
 /**
  * Options for {@link prequantize}.
  */
@@ -190,6 +200,16 @@ export type TemporalDitherOptions = {
    * Defaults to `true`.
    */
   changeDetection?: boolean | TemporalDitherChangeDetectionOptions;
+};
+
+/** Explicit lifecycle for one ordered temporal dithering sequence at a time. */
+export type TemporalDitherSequence = {
+  /** Start a fresh animation, replacing any active state. */
+  start(options: TemporalDitherOptions): TemporalDitherState;
+  /** Clear the active animation's history at a known boundary. */
+  reset(): void;
+  /** Clear and release the active state. */
+  end(): void;
 };
 
 /**
@@ -373,7 +393,8 @@ export type WriteFrameOptions = {
    * GIF color resolution and compression depth, an integer from `1` to `8`.
    * Must accommodate every entry in the active palette.
    *
-   * Defaults to `8`.
+   * Defaults to the minimum depth needed for the active palette. The logical
+   * screen color resolution defaults to 8 bits when this option is omitted.
    */
   colorDepth?: number;
 };
@@ -399,11 +420,19 @@ export type ByteStream = {
    */
   bytes: () => ByteArray;
   /**
+   * Release the output storage and clear the stream length. The returned view
+   * owns its ArrayBuffer, which can be transferred; unused capacity is zeroed.
+   * Earlier views of the same storage still alias it. This low-level operation
+   * does not reset encoder frame state; use GIFEncoderInstance.takeBytes there.
+   */
+  takeBytes: () => TransferableByteArray;
+  /**
    * Append one byte.
    */
   writeByte: (byte: number) => void;
   /**
-   * Append bytes from an array-like source.
+   * Append bytes from an array-like source. The length defaults to the
+   * remaining source after offset. Invalid ranges throw before writing.
    */
   writeBytes: (
     data: ArrayLike<number>,
@@ -411,7 +440,8 @@ export type ByteStream = {
     byteLength?: number,
   ) => void;
   /**
-   * Append bytes from a `Uint8Array` view.
+   * Append bytes from a `Uint8Array` view. The length defaults to the
+   * remaining view after offset. Invalid ranges throw before writing.
    */
   writeBytesView: (
     data: ByteArray,
@@ -441,6 +471,13 @@ export type GIFEncoderInstance = {
    */
   bytesView: () => ByteArray;
   /**
+   * Release output storage and reset frame state for another encoding. The
+   * returned view owns its transferable ArrayBuffer; only its view range is
+   * encoded data, and unused capacity is zeroed. Previous views may alias it.
+   * Compression workspace is retained; output storage is allocated on demand.
+   */
+  takeBytes: () => TransferableByteArray;
+  /**
    * Underlying output buffer. Use {@link bytes} or {@link bytesView} for the
    * written range.
    */
@@ -466,4 +503,21 @@ export type GIFEncoderInstance = {
     height: number,
     opts?: WriteFrameOptions,
   ) => void;
+};
+
+/** Options for independently encoding a frame in an animation. */
+export type FrameChunkOptions = Omit<WriteFrameOptions, "first"> & {
+  /** Zero-based position in the complete animation. */
+  sequenceIndex: number;
+  /** Shared global palette, identical for every chunk. */
+  globalPalette: Palette;
+};
+
+/** Serializable result of {@link encodeFrameChunk}; treat as immutable. */
+export type FrameChunk = {
+  sequenceIndex: number;
+  width: number;
+  height: number;
+  globalPalette: Palette;
+  bytes: ByteArray;
 };

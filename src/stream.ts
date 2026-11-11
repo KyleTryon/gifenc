@@ -17,22 +17,36 @@ export default function createStream(initialCapacity = 256): ByteStream {
     bytes() {
       return contents.slice(0, cursor);
     },
+    takeBytes() {
+      // Spare capacity can contain bytes from a previous use after reset().
+      contents.fill(0, cursor);
+      const result = contents.subarray(0, cursor);
+      contents = new Uint8Array(0);
+      cursor = 0;
+      return result;
+    },
     writeByte(byte: number) {
       expand(cursor + 1);
       contents[cursor] = byte;
       cursor++;
     },
-    writeBytes(data: ArrayLike<number>, offset = 0, byteLength = data.length) {
+    writeBytes(
+      data: ArrayLike<number>,
+      offset = 0,
+      byteLength = data.length - offset,
+    ) {
+      validateRange(data.length, offset, byteLength);
       expand(cursor + byteLength);
       for (let i = 0; i < byteLength; i++) {
-        const byte = data[i + offset];
-        if (byte == null) {
-          throw new Error("writeBytes() source range is out of bounds");
-        }
-        contents[cursor++] = byte;
+        contents[cursor++] = data[i + offset] as number;
       }
     },
-    writeBytesView(data: ByteArray, offset = 0, byteLength = data.byteLength) {
+    writeBytesView(
+      data: ByteArray,
+      offset = 0,
+      byteLength = data.byteLength - offset,
+    ) {
+      validateRange(data.byteLength, offset, byteLength);
       expand(cursor + byteLength);
       contents.set(data.subarray(offset, offset + byteLength), cursor);
       cursor += byteLength;
@@ -55,5 +69,22 @@ export default function createStream(initialCapacity = 256): ByteStream {
     const oldContents = contents;
     contents = new Uint8Array(newCapacity); // Allocate new storage.
     if (cursor > 0) contents.set(oldContents.subarray(0, cursor), 0);
+  }
+}
+
+function validateRange(
+  sourceLength: number,
+  offset: number,
+  byteLength: number,
+) {
+  if (
+    !Number.isSafeInteger(offset) ||
+    !Number.isSafeInteger(byteLength) ||
+    offset < 0 ||
+    byteLength < 0 ||
+    offset > sourceLength ||
+    byteLength > sourceLength - offset
+  ) {
+    throw new RangeError("Byte stream source range is out of bounds");
   }
 }

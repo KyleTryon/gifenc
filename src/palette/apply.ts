@@ -13,6 +13,8 @@ import type {
   RGBAInput,
 } from "../types.js";
 
+const DEFAULT_MAX_CACHE_ENTRIES = 262144;
+
 /**
  * Map RGBA pixels to palette indexes.
  *
@@ -41,7 +43,12 @@ export function applyPalette(
     return applyPaletteDither(rgba, palette, opts);
   }
 
-  return createMapper(palette, format, Infinity, "applyPalette").map(rgba);
+  return createMapper(
+    palette,
+    format,
+    DEFAULT_MAX_CACHE_ENTRIES,
+    "applyPalette",
+  ).map(rgba);
 }
 
 /**
@@ -61,8 +68,8 @@ export function createPaletteMapper(
   assertPaletteMatchesFormat(palette, opts.format, "createPaletteMapper");
   const maxCacheEntries =
     typeof options === "object" && options !== null
-      ? (options.maxCacheEntries ?? 262144)
-      : 262144;
+      ? (options.maxCacheEntries ?? DEFAULT_MAX_CACHE_ENTRIES)
+      : DEFAULT_MAX_CACHE_ENTRIES;
   if (!Number.isSafeInteger(maxCacheEntries) || maxCacheEntries < 1) {
     throw new Error(
       "createPaletteMapper() expected maxCacheEntries to be a positive safe integer",

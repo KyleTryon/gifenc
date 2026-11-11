@@ -1,6 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { applyPalette, createTemporalDither } from "../dist/gifenc.mjs";
+import {
+  applyPalette,
+  createTemporalDither,
+  createTemporalDitherSequence,
+} from "../dist/gifenc.mjs";
 
 const rgbPalette = [
   [0, 0, 0],
@@ -185,4 +189,46 @@ test("temporal dithering validates alpha handling", () => {
       }),
     /temporalDither format to match alpha handling/,
   );
+});
+
+test("sequence lifecycle isolates animations and resets scene history", () => {
+  const sequence = createTemporalDitherSequence();
+  const options = { width: 1, height: 1, decay: 1, maxError: 255 };
+  const frame = new Uint8Array([100, 100, 100, 255]);
+  const cut = new Uint8Array([30, 30, 30, 255]);
+  const map = (state, pixels = frame) =>
+    applyPalette(pixels, rgbPalette, { temporalDither: state })[0];
+  assert.throws(() => sequence.reset(), /not been started/);
+  const first = sequence.start(options);
+  assert.equal(map(first), 0);
+  assert.equal(map(first), 1);
+  sequence.reset();
+  assert.equal(map(first), 0);
+  assert.equal(map(first, cut), 0);
+  const next = sequence.start(options);
+  assert.equal(map(next), 0);
+  assert.equal(map(first), 0);
+  sequence.end();
+  sequence.end();
+  assert.equal(map(next), 0);
+  assert.throws(() => sequence.reset(), /not been started/);
+  const otherSequence = createTemporalDitherSequence();
+  const independent = otherSequence.start(options);
+  const concurrent = sequence.start(options);
+  assert.equal(map(independent), 0);
+  assert.equal(map(concurrent), 0);
+  assert.equal(map(independent), 1);
+  assert.equal(map(concurrent), 1);
+  const resized = sequence.start({
+    ...options,
+    width: 2,
+    changeDetection: false,
+  });
+  assert.equal(resized.width, 2);
+  assert.equal(resized.changeDetection, false);
+  assert.throws(
+    () => sequence.start({ ...options, width: 0 }),
+    /positive integer/,
+  );
+  sequence.reset();
 });
