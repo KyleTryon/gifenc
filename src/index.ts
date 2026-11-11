@@ -1,8 +1,11 @@
+export { frameDelay } from "./timing.js";
+export { encodeFrameChunk, assembleFrameChunks } from "./chunks.js";
 export { GIFEncoder, default } from "./encoder.js";
 export { default as quantize } from "./pnn-quant.js";
 export {
   applyPalette,
   createPaletteMapper,
+  createPaletteSampler,
   nearestColor,
   nearestColorIndex,
   nearestColorIndexWithDistance,
@@ -21,12 +24,15 @@ export type {
   DitherAlgorithm,
   DistanceFn,
   Format,
+  FrameChunk,
+  FrameChunkOptions,
   GIFEncoderInstance,
   GIFEncoderOptions,
   Int32Buffer,
   Palette,
   PaletteMapper,
   PaletteMapperOptions,
+  PaletteSampler,
   PrequantizeOptions,
   QuantizeOptions,
   RGBA,

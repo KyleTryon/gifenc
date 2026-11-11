@@ -4,6 +4,7 @@
     "bench/browser/bench.js",
     "bench/video-report/report.js",
     "examples/browser/worker.js",
+    "examples/browser/worker-encoder.js",
     "examples/node/encode.ts",
     "examples/node/encode-dither.ts",
     "test/**/*.test.mjs"

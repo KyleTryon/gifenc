@@ -33,6 +33,14 @@ import type {
  * @returns A mutable encoder instance.
  */
 export function GIFEncoder(opt: GIFEncoderOptions = {}): GIFEncoderInstance {
+  return createEncoder(opt);
+}
+
+/** @internal */
+export function createEncoder(
+  opt: GIFEncoderOptions,
+  globalPaletteLength = 0,
+): GIFEncoderInstance {
   const { initialCapacity = 4096, auto = true } = opt;
 
   // Stream all encoded data into this buffer
@@ -44,18 +52,12 @@ export function GIFEncoder(opt: GIFEncoderOptions = {}): GIFEncoderInstance {
   let codetab = new Int32Array(LZW_HASH_SIZE);
 
   let hasInit = false;
-  let globalPaletteLength = 0;
+  const initialGlobalPaletteLength = globalPaletteLength;
   let screenWidth = 0;
   let screenHeight = 0;
 
   return {
-    reset() {
-      stream.reset();
-      hasInit = false;
-      globalPaletteLength = 0;
-      screenWidth = 0;
-      screenHeight = 0;
-    },
+    reset,
     finish() {
       stream.writeByte(constants.trailer);
     },
@@ -64,6 +66,11 @@ export function GIFEncoder(opt: GIFEncoderOptions = {}): GIFEncoderInstance {
     },
     bytesView() {
       return stream.bytesView();
+    },
+    takeBytes() {
+      const result = stream.takeBytes();
+      reset();
+      return result;
     },
     get buffer() {
       return stream.buffer;
@@ -79,7 +86,7 @@ export function GIFEncoder(opt: GIFEncoderOptions = {}): GIFEncoderInstance {
         delay = 0,
         palette = null,
         repeat = 0, // -1=once, 0=forever, >0=count
-        colorDepth = 8,
+        colorDepth: requestedColorDepth,
         dispose = -1,
       } = opts;
 
@@ -127,7 +134,9 @@ export function GIFEncoder(opt: GIFEncoderOptions = {}): GIFEncoderInstance {
           "GIFEncoder.writeFrame() expected index length to match width * height",
         );
       }
-      assertColorDepth(colorDepth, "GIFEncoder.writeFrame");
+      if (requestedColorDepth !== undefined) {
+        assertColorDepth(requestedColorDepth, "GIFEncoder.writeFrame");
+      }
       assertTransparentIndex(transparentIndex, "GIFEncoder.writeFrame");
       assertDelay(delay, "GIFEncoder.writeFrame");
       assertRepeat(repeat, "GIFEncoder.writeFrame");
@@ -147,6 +156,7 @@ export function GIFEncoder(opt: GIFEncoderOptions = {}): GIFEncoderInstance {
           "GIFEncoder.writeFrame() requires a palette or a previously written global palette",
         );
       }
+      const colorDepth = requestedColorDepth ?? colorTableSize(paletteLength);
       if (paletteLength > 1 << colorDepth) {
         throw new Error(
           "GIFEncoder.writeFrame() expected colorDepth to accommodate the active palette",
@@ -191,7 +201,7 @@ export function GIFEncoder(opt: GIFEncoderOptions = {}): GIFEncoderInstance {
           width,
           height,
           globalPalette,
-          colorDepth,
+          requestedColorDepth ?? 8,
         );
         encodeColorTable(stream, globalPalette);
         if (repeat >= 0) {
@@ -216,6 +226,14 @@ export function GIFEncoder(opt: GIFEncoderOptions = {}): GIFEncoderInstance {
 
   function writeHeader(): void {
     writeUTFBytes(stream, "GIF89a");
+  }
+
+  function reset(): void {
+    stream.reset();
+    hasInit = false;
+    globalPaletteLength = initialGlobalPaletteLength;
+    screenWidth = 0;
+    screenHeight = 0;
   }
 }
 

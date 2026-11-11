@@ -10,3 +10,5 @@ export {
   createTemporalDither,
   createTemporalDitherSequence,
 } from "./temporal.js";
+
+export { createPaletteSampler } from "./sampling.js";
