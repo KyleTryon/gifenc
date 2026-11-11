@@ -120,6 +120,28 @@ try {
         instances.every((worker) => worker.terminated),
         "success leaked workers",
       );
+      const shared = await createWorkerEncoder({
+        ...opts,
+        workerUrl: "/examples/browser/shared-palette-worker.js",
+      });
+      const sharedColors = [
+        [255, 0, 0],
+        [0, 255, 0],
+        [0, 0, 255],
+        [0, 0, 0],
+      ];
+      for (let frame = 0; frame < 3; frame++) {
+        await shared.ready();
+        const pixels = new Uint8Array(16);
+        for (let pixel = 0; pixel < 4; pixel++)
+          pixels.set([...sharedColors[(pixel + frame) % 4], 255], pixel * 4);
+        shared.addFrame(pixels, frame);
+      }
+      const sharedBytes = await shared.finish();
+      assert(
+        instances.every((worker) => worker.terminated),
+        "shared-palette worker leaked resources",
+      );
       const oldCount = instances.length;
       const controller = new AbortController();
       const cancelled = await createWorkerEncoder({
@@ -270,7 +292,13 @@ try {
         four = [await bench(4)];
       four.push(await bench(4));
       one.push(await bench(1));
-      return { bytes: Array.from(bytes), one, four, order };
+      return {
+        bytes: Array.from(bytes),
+        sharedBytes: Array.from(sharedBytes),
+        one,
+        four,
+        order,
+      };
     }),
     delay(60000, undefined, { ref: false }).then(() => {
       throw new Error("Browser smoke test timed out");
@@ -292,6 +320,30 @@ try {
     ][frame];
     if (!expected.every((value, channel) => pixels[channel] === value))
       throw new Error(`Wrong decoded frame ${frame}`);
+  }
+  const sharedReader = new GifReader(Uint8Array.from(result.sharedBytes));
+  if (sharedReader.numFrames() !== 3)
+    throw new Error("Wrong shared frame count");
+  const sharedColors = [
+    [255, 0, 0],
+    [0, 255, 0],
+    [0, 0, 255],
+    [0, 0, 0],
+  ];
+  for (let frame = 0; frame < 3; frame++) {
+    if (sharedReader.frameInfo(frame).delay !== [8, 9, 3][frame])
+      throw new Error(`Wrong shared frame delay ${frame}`);
+    const pixels = new Uint8Array(16);
+    sharedReader.decodeAndBlitFrameRGBA(frame, pixels);
+    for (let pixel = 0; pixel < 4; pixel++) {
+      const expected = [...sharedColors[(pixel + frame) % 4], 255];
+      if (
+        !expected.every(
+          (value, channel) => pixels[pixel * 4 + channel] === value,
+        )
+      )
+        throw new Error(`Wrong shared frame ${frame}, pixel ${pixel}`);
+    }
   }
   console.log(
     `48 independent 256x256 frames: 1 worker ${result.one.map((n) => n.toFixed(0)).join(" / ")} ms, 4 workers ${result.four.map((n) => n.toFixed(0)).join(" / ")} ms; completion order ${result.order.slice(0, 3)}`,
