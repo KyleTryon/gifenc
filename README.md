@@ -288,6 +288,13 @@ Common methods:
 - `writeHeader()`: writes a header manually when `auto` is disabled.
 - `reset()`: reuses the encoder buffer for another GIF.
 
+The low-level `stream.writeBytes(data, offset, byteLength)` and
+`stream.writeBytesView(data, offset, byteLength)` methods default `byteLength` to
+the remaining source after `offset`. Offsets and lengths must be nonnegative
+integers within the source; invalid ranges throw `RangeError` before writing.
+Calls that previously passed out-of-bounds ranges must use valid ranges; they
+now throw instead of truncating, appending unwritten bytes, or partially writing.
+
 Frame options include:
 
 - `palette`: color table for the frame.

@@ -403,7 +403,8 @@ export type ByteStream = {
    */
   writeByte: (byte: number) => void;
   /**
-   * Append bytes from an array-like source.
+   * Append bytes from an array-like source. The length defaults to the
+   * remaining source after offset. Invalid ranges throw before writing.
    */
   writeBytes: (
     data: ArrayLike<number>,
@@ -411,7 +412,8 @@ export type ByteStream = {
     byteLength?: number,
   ) => void;
   /**
-   * Append bytes from a `Uint8Array` view.
+   * Append bytes from a `Uint8Array` view. The length defaults to the
+   * remaining view after offset. Invalid ranges throw before writing.
    */
   writeBytesView: (
     data: ByteArray,
