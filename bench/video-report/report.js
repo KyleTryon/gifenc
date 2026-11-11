@@ -81,15 +81,17 @@ const variants = [
     ditherMode: "spatial",
   },
   {
-    id: "balanced-128-spatial-serpentine",
-    name: "Balanced 128 spatial serpentine",
+    // Serpentine scanning is the default, so this variant turns it off to
+    // show what the alternating scan direction buys.
+    id: "balanced-128-spatial-raster",
+    name: "Balanced 128 spatial raster",
     scale: 1,
     fps: 12,
     colors: 128,
     format: "rgb565",
     paletteStrategy: "frame",
     ditherMode: "spatial",
-    serpentine: true,
+    serpentine: false,
   },
   {
     id: "balanced-128-spatial-temporal",
@@ -136,12 +138,21 @@ const variants = [
 
 const runButton = document.querySelector("#run-button");
 const resetButton = document.querySelector("#reset-button");
+const copyButton = document.querySelector("#copy-button");
+const sourceRoi = document.querySelector("#source-roi");
 const statusText = document.querySelector("#status");
 const progressBar = document.querySelector("#progress");
 const sourceVideo = document.querySelector("#source-video");
 const sourceMetrics = document.querySelector("#source-metrics");
 const sourceUrl = document.querySelector("#source-url");
 const resultsBody = document.querySelector("#results-body");
+const resultsHead = document.querySelector("#results-head");
+const tableFilter = document.querySelector("#table-filter");
+const columnMenu = document.querySelector("#column-menu");
+const columnMenuPanel = document.querySelector("#column-menu-panel");
+const selectionSummary = document.querySelector("#selection-summary");
+const compareSelectedButton = document.querySelector("#compare-selected");
+const compareSection = document.querySelector(".compare-section");
 const resultGrid = document.querySelector("#result-grid");
 const compareLeftSelect = document.querySelector("#compare-left");
 const compareRightSelect = document.querySelector("#compare-right");
@@ -152,12 +163,146 @@ let source = null;
 let sourceBlobUrl = "";
 let decodedFrames = null;
 let running = false;
+let runningId = null;
 let resultUrls = [];
 let resultsById = new Map();
 let compareSyncToken = 0;
 const compareSelection = {
   left: "balanced-128-spatial",
   right: "balanced-128-spatial-temporal",
+};
+
+// Data table: column definitions drive the header, cells, sorting, the
+// Columns menu, and best-value highlighting. Metric columns only have values
+// once a variant has finished encoding.
+const tableColumns = [
+  {
+    id: "name",
+    header: "Output",
+    hideable: false,
+    value: (variant) => variant.name,
+    cell: (variant) => variant.name,
+    sourceCell: () => "Source MP4",
+  },
+  {
+    id: "dimensions",
+    header: "Dimensions",
+    value: (variant) => variant.scale,
+    cell: (variant, result) =>
+      result
+        ? `${result.width} x ${result.height}`
+        : expectedDimensions(variant),
+    sourceCell: () => `${source.width} x ${source.height}`,
+  },
+  {
+    id: "frames",
+    header: "Frames",
+    numeric: true,
+    value: (variant) => variant.fps,
+    cell: (variant, result) =>
+      result ? formatInteger(result.frameCount) : expectedFrames(variant),
+    sourceCell: () => formatInteger(source.frameCount),
+  },
+  {
+    id: "fps",
+    header: "FPS",
+    numeric: true,
+    value: (variant) => variant.fps,
+    cell: (variant) => variant.fps,
+    sourceCell: () => source.fps,
+  },
+  {
+    id: "palette",
+    header: "Palette",
+    value: (variant) => variant.colors,
+    cell: (variant) =>
+      `${variant.colors} colors, ${variant.format}, ${paletteLabel(variant)}`,
+    sourceCell: () => "full quality video",
+  },
+  {
+    id: "dither",
+    header: "Dither",
+    value: (variant) => ditherLabel(variant),
+    cell: (variant) => ditherLabel(variant),
+    sourceCell: () => "none",
+  },
+  {
+    id: "size",
+    header: "Size",
+    numeric: true,
+    metric: true,
+    best: true,
+    value: (variant, result) => result.bytes,
+    cell: (variant, result) => formatBytes(result.bytes),
+    sourceCell: () => formatBytes(source.size),
+  },
+  {
+    id: "ratio",
+    header: "vs MP4",
+    numeric: true,
+    metric: true,
+    value: (variant, result) => result.bytes / source.size,
+    cell: (variant, result) =>
+      `${formatNumber(result.bytes / source.size, 2)}x`,
+    sourceCell: () => "1.00x",
+  },
+  {
+    id: "error",
+    header: "Sky error",
+    numeric: true,
+    metric: true,
+    best: true,
+    value: (variant, result) => result.sky.error,
+    cell: (variant, result) => formatSkyMetric(result.sky.error, 2),
+    sourceCell: () => "n/a",
+  },
+  {
+    id: "flicker",
+    header: "Sky flicker",
+    numeric: true,
+    metric: true,
+    best: true,
+    value: (variant, result) => result.sky.flicker,
+    cell: (variant, result) => formatSkyMetric(result.sky.flicker, 2),
+    sourceCell: () => "n/a",
+  },
+  {
+    id: "colors",
+    header: "Sky colors",
+    numeric: true,
+    metric: true,
+    value: (variant, result) => result.sky.uniqueColors,
+    cell: (variant, result) => formatSkyMetric(result.sky.uniqueColors, 1),
+    sourceCell: () => "n/a",
+  },
+  {
+    id: "encode",
+    header: "Encode time",
+    numeric: true,
+    metric: true,
+    best: true,
+    value: (variant, result) => result.encodeMs,
+    cell: (variant, result) => `${formatNumber(result.encodeMs / 1000, 2)}s`,
+    sourceCell: () => "n/a",
+  },
+  {
+    id: "download",
+    header: "Download",
+    metric: true,
+    sortable: false,
+    markdown: false,
+    cell: (variant, result) =>
+      `<a class="download-link" href="${result.url}" download="${variant.id}.gif">Download</a>`,
+    sourceCell: () => `<a class="download-link" href="${SOURCE_URL}">Open</a>`,
+  },
+];
+
+const HIDDEN_COLUMNS_KEY = "gifenc-video-report-hidden-columns";
+const tableState = {
+  sort: null,
+  filter: "",
+  hidden: new Set(loadHiddenColumns()),
+  selected: new Set(),
 };
 
 window.addEventListener("beforeunload", () => {
@@ -172,7 +317,10 @@ init().catch((error) => {
 runButton.addEventListener("click", () => {
   runBenchmark().catch((error) => {
     running = false;
+    runningId = null;
     runButton.disabled = !source;
+    resetButton.disabled = false;
+    renderTable();
     setStatus(`Benchmark failed: ${error.message}`);
     console.error(error);
   });
@@ -180,13 +328,78 @@ runButton.addEventListener("click", () => {
 
 resetButton.addEventListener("click", () => {
   clearResults();
-  if (source) {
-    renderSourceRow(source);
-  }
   decodedFrames = null;
   setProgress(0);
   setStatus(source ? "Ready." : "Loading source video...");
 });
+
+copyButton.addEventListener("click", () => {
+  if (!navigator.clipboard) {
+    setStatus("Copying needs a secure page (https or localhost).");
+    return;
+  }
+  navigator.clipboard.writeText(resultsMarkdown()).then(
+    () => {
+      copyButton.textContent = "Copied";
+      window.setTimeout(() => {
+        copyButton.textContent = "Copy as Markdown";
+      }, 1500);
+    },
+    (error) => setStatus(`Could not copy results: ${error.message}`),
+  );
+});
+
+resultsHead.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-sort]");
+  if (button) toggleSort(button.dataset.sort);
+});
+
+resultsHead.addEventListener("change", (event) => {
+  if (!event.target.matches("[data-select-all]")) return;
+  for (const variant of displayedVariants()) {
+    if (event.target.checked) tableState.selected.add(variant.id);
+    else tableState.selected.delete(variant.id);
+  }
+  renderTable();
+});
+
+resultsBody.addEventListener("change", (event) => {
+  const id = event.target.dataset.select;
+  if (!id) return;
+  if (event.target.checked) tableState.selected.add(id);
+  else tableState.selected.delete(id);
+  renderTable();
+});
+
+tableFilter.addEventListener("input", () => {
+  tableState.filter = tableFilter.value;
+  renderTable();
+});
+
+columnMenuPanel.addEventListener("change", (event) => {
+  const id = event.target.dataset.column;
+  if (!id) return;
+  if (event.target.checked) tableState.hidden.delete(id);
+  else tableState.hidden.add(id);
+  if (tableState.sort?.id === id) tableState.sort = null;
+  saveHiddenColumns();
+  renderTable();
+});
+
+document.addEventListener("click", (event) => {
+  if (columnMenu.open && !columnMenu.contains(event.target)) {
+    columnMenu.open = false;
+  }
+});
+
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && columnMenu.open) {
+    columnMenu.open = false;
+    columnMenu.querySelector("summary").focus();
+  }
+});
+
+compareSelectedButton.addEventListener("click", compareSelectedRows);
 
 compareLeftSelect.addEventListener("change", () => {
   compareSelection.left = compareLeftSelect.value;
@@ -199,8 +412,10 @@ compareRightSelect.addEventListener("change", () => {
 });
 
 async function init() {
+  renderColumnMenu();
   clearResults();
-  sourceUrl.textContent = SOURCE_URL;
+  sourceUrl.textContent = SOURCE_VIDEO.repoPath.split("/").pop();
+  sourceUrl.href = SOURCE_URL;
 
   const response = await fetch(SOURCE_URL);
   if (!response.ok) {
@@ -222,7 +437,7 @@ async function init() {
   };
 
   renderSourceMetrics(source);
-  renderSourceRow(source);
+  renderTable();
   renderCompareOptions();
   renderComparison();
   runButton.disabled = false;
@@ -234,14 +449,20 @@ async function runBenchmark() {
 
   running = true;
   runButton.disabled = true;
+  // Reset drops the decoded frames, which the encode loop below still needs.
+  resetButton.disabled = true;
   clearResults();
-  renderSourceRow(source);
   setProgress(0);
+  const started = performance.now();
 
   decodedFrames ??= await decodeSourceFrames(sourceBlobUrl, source);
 
   for (const [index, variant] of variants.entries()) {
-    setStatus(`Encoding ${variant.name}...`);
+    runningId = variant.id;
+    renderTable();
+    setStatus(
+      `Encoding ${index + 1} of ${variants.length}: ${variant.name}...`,
+    );
     const progressOffset = 10 + (index / variants.length) * 90;
     const progressSpan = 90 / variants.length;
     const result = await encodeVariant(source, decodedFrames, variant, (part) =>
@@ -252,10 +473,16 @@ async function runBenchmark() {
     await yieldToBrowser();
   }
 
+  runningId = null;
+  renderTable();
   setProgress(100);
-  setStatus("Benchmark complete.");
+  setStatus(
+    `Benchmark complete in ${formatNumber((performance.now() - started) / 1000, 1)}s.`,
+  );
   running = false;
   runButton.disabled = false;
+  resetButton.disabled = false;
+  copyButton.disabled = false;
 }
 
 async function decodeSourceFrames(videoUrl, metadata) {
@@ -296,9 +523,7 @@ async function decodeSourceFrames(videoUrl, metadata) {
 
 async function encodeVariant(metadata, frames, variant, onProgress) {
   const started = performance.now();
-  const width = Math.max(1, Math.round(metadata.width * variant.scale));
-  const height = Math.max(1, Math.round(metadata.height * variant.scale));
-  const frameCount = Math.round(metadata.duration * variant.fps);
+  const { width, height, frameCount } = variantOutputSize(metadata, variant);
   const selectedFrames = [];
   const scaleScratch =
     variant.scale === 1
@@ -460,58 +685,324 @@ function renderSourceMetrics(metadata) {
     ["Frame rate", `${metadata.fps} fps`],
     ["Frames", formatInteger(metadata.frameCount)],
     ["File size", formatBytes(metadata.size)],
-    ["Sky ROI", `${roi.width} x ${roi.height} at ${roi.x}, ${roi.y}`],
     [
       "Bit rate",
       `${formatNumber((metadata.size * 8) / metadata.duration / 1000, 0)} kbps`,
     ],
+    ["Sky ROI", `${roi.width} x ${roi.height} at ${roi.x}, ${roi.y}`],
   ];
 
   for (const [label, value] of metrics) {
     sourceMetrics.append(createMetric(label, value));
   }
+
+  sourceRoi.style.left = `${(roi.x / metadata.width) * 100}%`;
+  sourceRoi.style.top = `${(roi.y / metadata.height) * 100}%`;
+  sourceRoi.style.width = `${(roi.width / metadata.width) * 100}%`;
+  sourceRoi.style.height = `${(roi.height / metadata.height) * 100}%`;
+  sourceRoi.hidden = false;
+
+  // Media frames take the source's shape so the ROI box, which is positioned
+  // as a share of the frame, lines up with the pixels it measures.
+  document.documentElement.style.setProperty(
+    "--source-aspect",
+    `${metadata.width} / ${metadata.height}`,
+  );
 }
 
-function renderSourceRow(metadata) {
-  const row = document.createElement("tr");
-  row.innerHTML = `
-    <td>Source MP4</td>
-    <td>${metadata.width} x ${metadata.height}</td>
-    <td>${formatInteger(metadata.frameCount)}</td>
-    <td>${metadata.fps}</td>
-    <td>full quality video</td>
-    <td>none</td>
-    <td>${formatBytes(metadata.size)}</td>
-    <td>1.00x</td>
-    <td>n/a</td>
-    <td>n/a</td>
-    <td>n/a</td>
-    <td>n/a</td>
-    <td><a class="download-link" href="${SOURCE_URL}">Open</a></td>
-  `;
-  resultsBody.append(row);
+function renderTable() {
+  const focusKey = document.activeElement?.dataset?.focusKey;
+  const columns = visibleColumns();
+  const rows = displayedVariants();
+  const best = bestValues();
+  const selectedVisible = rows.filter((variant) =>
+    tableState.selected.has(variant.id),
+  ).length;
+
+  resultsHead.innerHTML = `<tr>
+    <th class="col-select" scope="col">
+      <input type="checkbox" data-select-all data-focus-key="select-all"
+        aria-label="Select all outputs"
+        ${rows.length > 0 && selectedVisible === rows.length ? "checked" : ""} />
+    </th>
+    ${columns.map(headerCell).join("")}
+  </tr>`;
+  resultsHead.querySelector("[data-select-all]").indeterminate =
+    selectedVisible > 0 && selectedVisible < rows.length;
+
+  const body = [];
+  if (source) {
+    body.push(`<tr class="reference">
+      <td class="col-select"></td>
+      ${columns.map((column) => bodyCell(column, column.sourceCell())).join("")}
+    </tr>`);
+  }
+  for (const variant of rows) {
+    body.push(variantRow(variant, columns, best));
+  }
+  if (rows.length === 0) {
+    body.push(`<tr><td class="pending" colspan="${columns.length + 1}">
+      No outputs match the filter.
+    </td></tr>`);
+  }
+  resultsBody.innerHTML = body.join("");
+
+  const shown =
+    rows.length === variants.length
+      ? `${variants.length} outputs`
+      : `Showing ${rows.length} of ${variants.length} outputs`;
+  selectionSummary.textContent = `${shown}. ${selectedVisible} selected.`;
+  compareSelectedButton.disabled = selectedVisible !== 2;
+  compareSelectedButton.title =
+    selectedVisible === 2 ? "" : "Select exactly two outputs to compare";
+
+  if (focusKey) {
+    document
+      .querySelector(`[data-focus-key="${focusKey}"]`)
+      ?.focus({ preventScroll: true });
+  }
+}
+
+function headerCell(column) {
+  const className = columnClass(column);
+  if (column.sortable === false) {
+    return `<th class="${className}" scope="col">${column.header}</th>`;
+  }
+  const sort = tableState.sort;
+  const direction =
+    sort?.id === column.id ? (sort.desc ? "descending" : "ascending") : "";
+  const icon =
+    direction === "ascending" ? "↑" : direction === "descending" ? "↓" : "↕";
+  return `<th class="${className}" scope="col"${direction ? ` aria-sort="${direction}"` : ""}>
+    <button class="sort-button" type="button" data-sort="${column.id}"
+      data-focus-key="sort-${column.id}">
+      ${column.header}<span class="sort-icon" aria-hidden="true">${icon}</span>
+    </button>
+  </th>`;
+}
+
+function variantRow(variant, columns, best) {
+  const result = resultsById.get(variant.id);
+  const selected = tableState.selected.has(variant.id);
+  const isRunning = variant.id === runningId;
+  const cells = [];
+  let pendingSpan = 0;
+
+  for (const column of columns) {
+    if (column.metric && !result) {
+      pendingSpan++;
+      continue;
+    }
+    const isBest =
+      result &&
+      column.best &&
+      column.value(variant, result) === best[column.id];
+    const text = column.cell(variant, result);
+    cells.push(
+      bodyCell(column, isBest ? `<span class="best">${text}</span>` : text),
+    );
+  }
+  if (pendingSpan > 0) {
+    cells.push(
+      `<td class="pending" colspan="${pendingSpan}">${isRunning ? "Encoding..." : "Queued"}</td>`,
+    );
+  }
+
+  return `<tr class="${isRunning ? "running" : ""}"${selected ? ' data-state="selected"' : ""}>
+    <td class="col-select">
+      <input type="checkbox" data-select="${variant.id}"
+        data-focus-key="select-${variant.id}"
+        aria-label="Select ${variant.name}"${selected ? " checked" : ""} />
+    </td>
+    ${cells.join("")}
+  </tr>`;
+}
+
+function bodyCell(column, content) {
+  return `<td class="${columnClass(column)}">${content}</td>`;
+}
+
+function columnClass(column) {
+  return `col-${column.id}${column.numeric ? " num" : ""}`;
+}
+
+function visibleColumns() {
+  return tableColumns.filter((column) => !tableState.hidden.has(column.id));
+}
+
+function displayedVariants() {
+  const query = tableState.filter.trim().toLowerCase();
+  const rows = variants.filter(
+    (variant) => !query || variantSearchText(variant).includes(query),
+  );
+  const sort = tableState.sort;
+  if (!sort) return rows;
+
+  const column = tableColumns.find((candidate) => candidate.id === sort.id);
+  const direction = sort.desc ? -1 : 1;
+  return rows
+    .map((variant, index) => {
+      const result = resultsById.get(variant.id);
+      const value =
+        column.metric && !result ? null : column.value(variant, result);
+      return { variant, index, value };
+    })
+    .sort((a, b) => {
+      // Unfinished rows have no metric values; keep them last either way.
+      if (a.value == null || b.value == null) {
+        if (a.value == null && b.value == null) return a.index - b.index;
+        return a.value == null ? 1 : -1;
+      }
+      const diff =
+        typeof a.value === "string"
+          ? a.value.localeCompare(b.value)
+          : a.value - b.value;
+      return diff * direction || a.index - b.index;
+    })
+    .map((entry) => entry.variant);
+}
+
+function variantSearchText(variant) {
+  return [
+    variant.name,
+    `${variant.colors} colors`,
+    variant.format,
+    paletteLabel(variant),
+    ditherLabel(variant),
+  ]
+    .join(" ")
+    .toLowerCase();
+}
+
+function bestValues() {
+  const finished = variants.filter((variant) => resultsById.has(variant.id));
+  if (finished.length < 2) return {};
+  const best = {};
+  for (const column of tableColumns) {
+    if (!column.best) continue;
+    best[column.id] = Math.min(
+      ...finished.map((variant) =>
+        column.value(variant, resultsById.get(variant.id)),
+      ),
+    );
+  }
+  return best;
+}
+
+function toggleSort(columnId) {
+  const sort = tableState.sort;
+  if (sort?.id !== columnId) {
+    tableState.sort = { id: columnId, desc: false };
+  } else if (!sort.desc) {
+    tableState.sort = { id: columnId, desc: true };
+  } else {
+    tableState.sort = null;
+  }
+  renderTable();
+}
+
+function renderColumnMenu() {
+  columnMenuPanel.innerHTML = tableColumns
+    .filter((column) => column.hideable !== false)
+    .map(
+      (column) => `<label>
+        <input type="checkbox" data-column="${column.id}"
+          ${tableState.hidden.has(column.id) ? "" : "checked"} />
+        ${column.header}
+      </label>`,
+    )
+    .join("");
+}
+
+function loadHiddenColumns() {
+  try {
+    const stored = JSON.parse(localStorage.getItem(HIDDEN_COLUMNS_KEY));
+    return Array.isArray(stored) ? stored : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveHiddenColumns() {
+  try {
+    localStorage.setItem(
+      HIDDEN_COLUMNS_KEY,
+      JSON.stringify([...tableState.hidden]),
+    );
+  } catch {
+    // Storage can be unavailable; column choices then last for this visit.
+  }
+}
+
+function compareSelectedRows() {
+  const [left, right] = displayedVariants()
+    .filter((variant) => tableState.selected.has(variant.id))
+    .map((variant) => variant.id);
+  if (!left || !right) return;
+  compareSelection.left = left;
+  compareSelection.right = right;
+  renderCompareOptions();
+  renderComparison();
+  compareSection.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function variantOutputSize(metadata, variant) {
+  return {
+    width: Math.max(1, Math.round(metadata.width * variant.scale)),
+    height: Math.max(1, Math.round(metadata.height * variant.scale)),
+    frameCount: Math.round(metadata.duration * variant.fps),
+  };
+}
+
+function expectedDimensions(variant) {
+  if (!source) return "";
+  const { width, height } = variantOutputSize(source, variant);
+  return `${width} x ${height}`;
+}
+
+function expectedFrames(variant) {
+  return source
+    ? formatInteger(variantOutputSize(source, variant).frameCount)
+    : "";
+}
+
+// Copies what the table shows: the visible columns, in the current order,
+// for the finished outputs that pass the filter.
+function resultsMarkdown() {
+  const columns = visibleColumns().filter(
+    (column) => column.markdown !== false,
+  );
+  const rows = displayedVariants().filter((variant) =>
+    resultsById.has(variant.id),
+  );
+  const lines = [
+    `### gifenc video benchmark (${SOURCE_VIDEO.name})`,
+    "",
+    `Source: ${source.width} x ${source.height}, ${source.fps} fps, ${formatBytes(source.size)}. Browser: ${navigator.userAgent}, ${navigator.hardwareConcurrency} logical cores.`,
+    "",
+  ];
+  if (rows.length < resultsById.size) {
+    lines.push(
+      `Filtered by "${tableState.filter.trim()}": ${rows.length} of ${resultsById.size} outputs.`,
+      "",
+    );
+  }
+  lines.push(
+    `| ${columns.map((column) => column.header).join(" | ")} |`,
+    `| ${columns.map((column) => (column.numeric ? "---:" : "---")).join(" | ")} |`,
+  );
+  for (const variant of rows) {
+    const result = resultsById.get(variant.id);
+    lines.push(
+      `| ${columns.map((column) => column.cell(variant, result)).join(" | ")} |`,
+    );
+  }
+  return `${lines.join("\n")}\n`;
 }
 
 function renderVariantResult(metadata, variant, result) {
-  const ratio = result.bytes / metadata.size;
   resultsById.set(variant.id, result);
-  const row = document.createElement("tr");
-  row.innerHTML = `
-    <td>${variant.name}</td>
-    <td>${result.width} x ${result.height}</td>
-    <td>${formatInteger(result.frameCount)}</td>
-    <td>${variant.fps}</td>
-    <td>${variant.colors} colors, ${variant.format}, ${paletteLabel(variant)}</td>
-    <td>${ditherLabel(variant)}</td>
-    <td>${formatBytes(result.bytes)}</td>
-    <td>${formatNumber(ratio, 2)}x</td>
-    <td>${formatSkyMetric(result.sky.error, 2)}</td>
-    <td>${formatSkyMetric(result.sky.flicker, 2)}</td>
-    <td>${formatSkyMetric(result.sky.uniqueColors, 1)}</td>
-    <td>${formatNumber(result.encodeMs / 1000, 2)}s</td>
-    <td><a class="download-link" href="${result.url}" download="${variant.id}.gif">Download</a></td>
-  `;
-  resultsBody.append(row);
+  renderTable();
 
   const card =
     resultGrid.querySelector(`[data-variant-id="${variant.id}"]`) ??
@@ -540,7 +1031,8 @@ function clearResults() {
   }
   resultUrls = [];
   resultsById = new Map();
-  resultsBody.innerHTML = "";
+  copyButton.disabled = true;
+  renderTable();
   resultGrid.innerHTML = "";
 
   for (const variant of variants) {
@@ -580,14 +1072,14 @@ function ditherLabel(variant) {
   if (variant.ditherMode === "spatial") {
     return joinLabels([
       "spatial Floyd-Steinberg",
-      variant.serpentine ? "serpentine" : "",
+      variant.serpentine === false ? "raster scan" : "",
       ditherStrengthLabel(variant),
     ]);
   }
   if (variant.ditherMode === "spatial-temporal") {
     return joinLabels([
       "spatial Floyd-Steinberg + temporal dithering",
-      variant.serpentine ? "serpentine" : "",
+      variant.serpentine === false ? "raster scan" : "",
       ditherStrengthLabel(variant),
       temporalSettingsLabel(variant),
     ]);
