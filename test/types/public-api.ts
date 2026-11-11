@@ -3,9 +3,12 @@ import {
   applyPalette,
   createPaletteMapper,
   createTemporalDither,
+  createTemporalDitherSequence,
+  frameDelay,
   nearestColorIndex,
   nearestColorIndexWithDistance,
   quantize,
+  createPaletteSampler,
   type ApplyPaletteOptions,
   type Color,
   type Palette,
@@ -15,6 +18,7 @@ import {
   type RGBA,
   type TemporalDitherChangeDetectionOptions,
   type TemporalDitherOptions,
+  type TemporalDitherSequence,
   type TemporalDitherState,
 } from "../../src/index.js";
 
@@ -58,6 +62,12 @@ const changeDetection: TemporalDitherChangeDetectionOptions = {
 const temporalDither: TemporalDitherState =
   createTemporalDither(temporalOptions);
 
+const sequence: TemporalDitherSequence = createTemporalDitherSequence();
+const sequenceState: TemporalDitherState = sequence.start(temporalOptions);
+applyPalette(rgbaData, quantized, { temporalDither: sequenceState });
+sequence.reset();
+sequence.end();
+
 applyPalette(rgbaData, quantized, paletteOptions);
 createTemporalDither({
   width: 1,
@@ -74,7 +84,17 @@ applyPalette(rgbaData, palette, {
 });
 temporalDither.reset();
 const normalizedChangeDetection = temporalDither.changeDetection;
-GIFEncoder().writeFrame(indexed, 1, 1, { palette: [rgb] });
+GIFEncoder().writeFrame(indexed, 1, 1, {
+  palette: [rgb],
+  delay: frameDelay(0, 100),
+});
+// @ts-expect-error boundaries must be numbers
+frameDelay("0", 100);
+const transferableOutput: ArrayBuffer = GIFEncoder().takeBytes().buffer;
+const transferableStreamOutput: ArrayBuffer =
+  GIFEncoder().stream.takeBytes().buffer;
+void transferableOutput;
+void transferableStreamOutput;
 
 const nearestIndex: number = nearestColorIndex(palette, rgb);
 const nearestWithDistance: [number, number] = nearestColorIndexWithDistance(
@@ -116,3 +136,9 @@ createTemporalDither({
 
 void invalidColor;
 void invalidPalette;
+
+const sampler = createPaletteSampler(100, 10);
+sampler.addFrame(rgbaData);
+sampler.addFrame(null);
+const sampledPalette: Palette = sampler.quantize(16, { format: "rgba4444" });
+void sampledPalette;
