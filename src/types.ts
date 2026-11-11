@@ -375,7 +375,8 @@ export type WriteFrameOptions = {
    * GIF color resolution and compression depth, an integer from `1` to `8`.
    * Must accommodate every entry in the active palette.
    *
-   * Defaults to `8`.
+   * Defaults to the minimum depth needed for the active palette. The logical
+   * screen color resolution defaults to 8 bits when this option is omitted.
    */
   colorDepth?: number;
 };

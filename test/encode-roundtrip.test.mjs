@@ -125,3 +125,54 @@ test("maximum GIF width is preserved and reset clears palette and screen state",
   gif.finish();
   assert.deepEqual(Array.from(decode(gif).pixels), [4, 5, 6, 255]);
 });
+
+test("automatic LZW depth follows each active palette and survives reset", () => {
+  const gif = GIFEncoder();
+  for (const count of [1, 2, 3, 64, 128, 256]) {
+    gif.reset();
+    const palette = Array.from({ length: count }, (_, i) => [
+      i,
+      255 - i,
+      i ^ 127,
+    ]);
+    let seed = 123456789;
+    const index = Uint8Array.from({ length: 65536 }, () => {
+      seed ^= seed << 13;
+      seed ^= seed >>> 17;
+      seed ^= seed << 5;
+      return (seed >>> 0) % count;
+    });
+    gif.writeFrame(index, 256, 256, { palette });
+    gif.writeFrame(index, 256, 256);
+    gif.writeFrame(index, 256, 256, { palette });
+    gif.finish();
+    const reader = new GifReader(gif.bytes());
+    const expected = new Uint8Array(
+      Array.from(index, (i) => [...palette[i], 255]).flat(),
+    );
+    assert.equal((gif.bytes()[10] >> 4) & 7, 7);
+    for (let frame = 0; frame < 3; frame++) {
+      assert.equal(
+        gif.bytes()[reader.frameInfo(frame).data_offset],
+        Math.max(2, Math.ceil(Math.log2(count))),
+      );
+      assert.deepEqual(decode(gif, frame).pixels, expected);
+    }
+  }
+});
+
+test("palette swaps use local depth before returning to global depth", () => {
+  const gif = GIFEncoder();
+  const global = Array.from({ length: 64 }, (_, i) => [i, 0, 0]);
+  const local = Array.from({ length: 3 }, (_, i) => [0, i, 0]);
+  gif.writeFrame(new Uint8Array([63]), 1, 1, { palette: global });
+  gif.writeFrame(new Uint8Array([2]), 1, 1, { palette: local });
+  gif.writeFrame(new Uint8Array([63]), 1, 1);
+  gif.finish();
+  const reader = new GifReader(gif.bytes());
+  assert.deepEqual(
+    [0, 1, 2].map((i) => gif.bytes()[reader.frameInfo(i).data_offset]),
+    [6, 2, 6],
+  );
+  assert.deepEqual(Array.from(decode(gif, 1).pixels), [0, 2, 0, 255]);
+});
