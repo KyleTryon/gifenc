@@ -96,3 +96,41 @@ test("mapper validates palettes, cache limits, options, and each source frame", 
   );
   assert.deepEqual(mapper.map(new Uint8Array()), new Uint8Array());
 });
+
+for (const format of ["rgb565", "rgba4444"]) {
+  test(`${format} one-shot mapping stays exact after cache eviction`, () => {
+    const palette =
+      format === "rgba4444"
+        ? [
+            [0, 0, 0, 0],
+            [255, 255, 255, 255],
+            [127, 127, 127, 128],
+          ]
+        : [
+            [0, 0, 0],
+            [255, 255, 255],
+            [127, 127, 127],
+          ];
+    const count = 262144 + 32;
+    const pixels = new Uint8Array((count + 2) * 4);
+    for (let i = 0; i < count; i++) {
+      pixels.set(
+        [i & 255, (i >>> 8) & 255, (i >>> 16) & 255, (i * 31) & 255],
+        i * 4,
+      );
+    }
+    pixels.set(pixels.subarray(0, 8), count * 4);
+    const expected = createPaletteMapper(palette, {
+      format,
+      maxCacheEntries: 1,
+    }).map(pixels);
+    assert.deepEqual(applyPalette(pixels, palette, format), expected);
+    const reversed = new Uint8Array(pixels.length);
+    for (let i = 0; i < count + 2; i++)
+      reversed.set(pixels.subarray(i * 4, i * 4 + 4), (count + 1 - i) * 4);
+    assert.deepEqual(
+      applyPalette(reversed, palette, format),
+      expected.reverse(),
+    );
+  });
+}
