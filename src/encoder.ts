@@ -57,13 +57,7 @@ export function createEncoder(
   let screenHeight = 0;
 
   return {
-    reset() {
-      stream.reset();
-      hasInit = false;
-      globalPaletteLength = initialGlobalPaletteLength;
-      screenWidth = 0;
-      screenHeight = 0;
-    },
+    reset,
     finish() {
       stream.writeByte(constants.trailer);
     },
@@ -72,6 +66,11 @@ export function createEncoder(
     },
     bytesView() {
       return stream.bytesView();
+    },
+    takeBytes() {
+      const result = stream.takeBytes();
+      reset();
+      return result;
     },
     get buffer() {
       return stream.buffer;
@@ -224,6 +223,14 @@ export function createEncoder(
 
   function writeHeader(): void {
     writeUTFBytes(stream, "GIF89a");
+  }
+
+  function reset(): void {
+    stream.reset();
+    hasInit = false;
+    globalPaletteLength = initialGlobalPaletteLength;
+    screenWidth = 0;
+    screenHeight = 0;
   }
 }
 

@@ -16,6 +16,8 @@ export type DitherAlgorithm = "floyd-steinberg";
  */
 export type ByteArray = Uint8Array;
 
+type TransferableByteArray = ByteArray & { readonly buffer: ArrayBuffer };
+
 /**
  * Browser canvas-compatible RGBA byte buffer.
  */
@@ -399,6 +401,13 @@ export type ByteStream = {
    */
   bytes: () => ByteArray;
   /**
+   * Release the output storage and clear the stream length. The returned view
+   * owns its ArrayBuffer, which can be transferred; unused capacity is zeroed.
+   * Earlier views of the same storage still alias it. This low-level operation
+   * does not reset encoder frame state; use GIFEncoderInstance.takeBytes there.
+   */
+  takeBytes: () => TransferableByteArray;
+  /**
    * Append one byte.
    */
   writeByte: (byte: number) => void;
@@ -442,6 +451,13 @@ export type GIFEncoderInstance = {
    * Return a view of encoded GIF bytes without copying.
    */
   bytesView: () => ByteArray;
+  /**
+   * Release output storage and reset frame state for another encoding. The
+   * returned view owns its transferable ArrayBuffer; only its view range is
+   * encoded data, and unused capacity is zeroed. Previous views may alias it.
+   * Compression workspace is retained; output storage is allocated on demand.
+   */
+  takeBytes: () => TransferableByteArray;
   /**
    * Underlying output buffer. Use {@link bytes} or {@link bytesView} for the
    * written range.

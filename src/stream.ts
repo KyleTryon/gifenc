@@ -17,6 +17,14 @@ export default function createStream(initialCapacity = 256): ByteStream {
     bytes() {
       return contents.slice(0, cursor);
     },
+    takeBytes() {
+      // Spare capacity can contain bytes from a previous use after reset().
+      contents.fill(0, cursor);
+      const result = contents.subarray(0, cursor);
+      contents = new Uint8Array(0);
+      cursor = 0;
+      return result;
+    },
     writeByte(byte: number) {
       expand(cursor + 1);
       contents[cursor] = byte;

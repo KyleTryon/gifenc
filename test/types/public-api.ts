@@ -81,6 +81,11 @@ GIFEncoder().writeFrame(indexed, 1, 1, {
 });
 // @ts-expect-error boundaries must be numbers
 frameDelay("0", 100);
+const transferableOutput: ArrayBuffer = GIFEncoder().takeBytes().buffer;
+const transferableStreamOutput: ArrayBuffer =
+  GIFEncoder().stream.takeBytes().buffer;
+void transferableOutput;
+void transferableStreamOutput;
 
 const nearestIndex: number = nearestColorIndex(palette, rgb);
 const nearestWithDistance: [number, number] = nearestColorIndexWithDistance(

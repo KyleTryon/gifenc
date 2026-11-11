@@ -285,8 +285,48 @@ Common methods:
 - `finish()`: writes the GIF trailer.
 - `bytes()`: returns a copied `Uint8Array`.
 - `bytesView()`: returns a direct view into the encoder buffer.
+- `takeBytes()`: releases the output buffer and resets frame state, returning a
+  transferable view without copying the written bytes.
 - `writeHeader()`: writes a header manually when `auto` is disabled.
 - `reset()`: reuses the encoder buffer for another GIF.
+
+`bytes()` is an independent exact-sized copy. `bytesView()` and `buffer` refer
+to encoder-owned storage: writing, growing, or resetting can invalidate the
+view or change its contents. Do not transfer that storage while the encoder
+uses it. `reset()` retains output capacity and compression workspace; views
+from before reset can be overwritten by later writes.
+
+`takeBytes()` transfers ownership of the output storage to the caller and
+resets the encoder as if for a new GIF. It retains the compression workspace,
+but allocates new output storage on subsequent writes. The returned view starts
+at offset zero and its `byteLength` is the written length; its `buffer` can be
+larger, with unused bytes zeroed. Transfer the view together with its buffer,
+not the buffer alone as if its whole capacity were GIF data. Earlier views of
+the released storage still alias it and are detached if its buffer is
+transferred. Finish a complete GIF before taking it; manual chunks need no
+trailer until assembly. The low-level `stream.takeBytes()` only resets the
+stream, not the encoder's frame state.
+
+For example, a worker can retain one encoder per encoding mode and transfer
+each result without copying it:
+
+```js
+const encoder = GIFEncoder(); // keep in the worker, outside the message handler
+// For each independent GIF: write frames and call finish().
+const bytes = encoder.takeBytes();
+postMessage({ bytes }, [bytes.buffer]);
+// The receiver uses bytes.byteOffset and bytes.byteLength; the worker can
+// immediately write a new GIF with encoder.
+```
+
+Cliparr can adopt this after a release by retaining suitable worker encoders,
+returning `takeBytes()` from frame encoding, and changing the worker message
+and receiver to carry the typed-array view (including its length) while
+transferring `bytes.buffer`. This removes both the `bytes()` copy and the
+worker's extra ArrayBuffer copy. Preserve the existing framing and palette
+rules; resetting an encoder does not supply a prior chunk's global palette.
+For final assembly, an owned view can likewise be passed to `Blob` directly;
+Blob construction may itself copy according to the platform.
 
 The low-level `stream.writeBytes(data, offset, byteLength)` and
 `stream.writeBytesView(data, offset, byteLength)` methods default `byteLength` to
