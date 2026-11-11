@@ -80,6 +80,7 @@
     "serve": "node scripts/serve.mjs",
     "dist:cjs": "pnpm run build:cjs",
     "knip": "knip",
+    "bench:animation": "pnpm run build:esm && node bench/node/animation.mjs",
     "test:browser": "pnpm run build:esm && node test/browser/smoke.mjs"
   },
   "keywords": [
