@@ -33,6 +33,14 @@ import type {
  * @returns A mutable encoder instance.
  */
 export function GIFEncoder(opt: GIFEncoderOptions = {}): GIFEncoderInstance {
+  return createEncoder(opt);
+}
+
+/** @internal */
+export function createEncoder(
+  opt: GIFEncoderOptions,
+  globalPaletteLength = 0,
+): GIFEncoderInstance {
   const { initialCapacity = 4096, auto = true } = opt;
 
   // Stream all encoded data into this buffer
@@ -44,7 +52,7 @@ export function GIFEncoder(opt: GIFEncoderOptions = {}): GIFEncoderInstance {
   let codetab = new Int32Array(LZW_HASH_SIZE);
 
   let hasInit = false;
-  let globalPaletteLength = 0;
+  const initialGlobalPaletteLength = globalPaletteLength;
   let screenWidth = 0;
   let screenHeight = 0;
 
@@ -220,7 +228,7 @@ export function GIFEncoder(opt: GIFEncoderOptions = {}): GIFEncoderInstance {
   function reset(): void {
     stream.reset();
     hasInit = false;
-    globalPaletteLength = 0;
+    globalPaletteLength = initialGlobalPaletteLength;
     screenWidth = 0;
     screenHeight = 0;
   }
