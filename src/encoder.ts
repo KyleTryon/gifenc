@@ -167,8 +167,15 @@ export function createEncoder(
           "GIFEncoder.writeFrame() expected transparentIndex within the active palette",
         );
       }
-      for (const pixel of index) {
-        if (pixel >= paletteLength) {
+      // Uint8Array values never exceed 255, so a full palette needs no scan.
+      // An indexed max loop is several times faster than for...of here.
+      if (paletteLength < 256) {
+        let maxIndex = 0;
+        for (let i = 0; i < index.length; i++) {
+          const value = index[i] as number;
+          if (value > maxIndex) maxIndex = value;
+        }
+        if (maxIndex >= paletteLength) {
           throw new Error(
             "GIFEncoder.writeFrame() expected every index within the active palette",
           );

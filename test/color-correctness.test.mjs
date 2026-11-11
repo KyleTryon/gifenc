@@ -1,6 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { applyPalette, prequantize, quantize } from "../dist/gifenc.mjs";
+import {
+  applyPalette,
+  nearestColorIndex,
+  prequantize,
+  quantize,
+  snapColorsToPalette,
+} from "../dist/gifenc.mjs";
 
 test("prequantize clamps rounded channels without overflowing into neighbors", () => {
   for (const ArrayType of [Uint8Array, Uint8ClampedArray]) {
@@ -84,3 +90,77 @@ for (const format of ["rgb444", "rgb565", "rgba4444"]) {
     assert.deepEqual(Array.from(reverse), [1, 0]);
   });
 }
+
+test("snapColorsToPalette keeps a known color that is already present", () => {
+  const palette = [
+    [10, 10, 10],
+    [200, 0, 0],
+  ];
+  snapColorsToPalette(palette, [
+    [10, 10, 10],
+    [12, 12, 12],
+  ]);
+  assert.deepEqual(palette, [
+    [10, 10, 10],
+    [200, 0, 0],
+  ]);
+});
+
+test("snapColorsToPalette snaps each entry once and compares alpha", () => {
+  const palette = [
+    [9, 9, 9],
+    [200, 0, 0],
+  ];
+  snapColorsToPalette(palette, [
+    [10, 10, 10],
+    [11, 11, 11],
+  ]);
+  assert.deepEqual(palette, [
+    [10, 10, 10],
+    [200, 0, 0],
+  ]);
+
+  const rgba = [
+    [2, 2, 2, 255],
+    [100, 100, 100, 255],
+  ];
+  snapColorsToPalette(rgba, [[0, 0, 0, 0]]);
+  assert.deepEqual(rgba, [
+    [2, 2, 2, 255],
+    [100, 100, 100, 255],
+  ]);
+  snapColorsToPalette(rgba, [[0, 0, 0, 255]]);
+  assert.deepEqual(rgba[0], [0, 0, 0, 255]);
+});
+
+test("nearestColorIndex compares shared channels of RGB and RGBA colors", () => {
+  assert.equal(
+    nearestColorIndex(
+      [
+        [0, 0, 0],
+        [255, 255, 255],
+      ],
+      [250, 250, 250, 255],
+    ),
+    1,
+  );
+});
+
+test("snapColorsToPalette ignores repeated known colors", () => {
+  const palette = [
+    [1, 1, 1],
+    [5, 5, 5],
+  ];
+  snapColorsToPalette(
+    palette,
+    [
+      [1, 1, 1],
+      [1, 1, 1],
+    ],
+    10,
+  );
+  assert.deepEqual(palette, [
+    [1, 1, 1],
+    [5, 5, 5],
+  ]);
+});

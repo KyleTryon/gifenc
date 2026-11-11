@@ -1,11 +1,12 @@
 import { assertRgbaByteLength } from "../rgba.js";
 import { createPaletteLookup } from "./lookup.js";
 import {
-  commitTemporalDitherFrame,
-  prepareTemporalDitherFrame,
+  beginTemporalFrame,
+  commitTemporalFrame,
+  sourceDistanceSq,
   temporalDitherChannels,
 } from "./temporal.js";
-import { alpha, blue, byteAt, green, red } from "./utils.js";
+import { alpha, blue, byteAt, colorAt, green, red } from "./utils.js";
 import type { Palette, RGBAInput } from "../types.js";
 import type { NormalizedApplyPaletteOptions } from "./options.js";
 
@@ -31,9 +32,6 @@ export function applyPaletteDither(
     opts;
   assertRgbaByteLength(rgba, "applyPalette");
   const length = rgba.length / 4;
-  if (length !== Math.floor(length)) {
-    throw new Error("applyPalette() expected RGBA data length to divide by 4");
-  }
   const resolvedWidth = width ?? temporalDither?.width;
   if (
     !resolvedWidth ||
@@ -54,65 +52,65 @@ export function applyPaletteDither(
       "applyPalette() requires { width, height } to match RGBA data when dithering",
     );
   }
+  if (palette.length === 0) {
+    throw new Error(
+      "applyPalette() expected a non-empty palette when dithering",
+    );
+  }
 
   const hasAlpha = format === "rgba4444";
   const channels = temporalDitherChannels(format);
   const nearest = createPaletteLookup(palette, hasAlpha);
-  const temporalErrors = temporalDither
-    ? prepareTemporalDitherFrame(
+  const temporal = temporalDither
+    ? beginTemporalFrame(
         temporalDither,
         rgba,
         format,
         resolvedWidth,
         resolvedHeight,
+        nearest,
         "applyPalette",
       )
     : null;
-  const rowLength = resolvedWidth * channels;
-  const diffusionLength = rowLength * Math.min(2, resolvedHeight);
-  const pixels = acquireScratch(diffusionLength * (temporalErrors ? 2 : 1));
-  const index = new Uint8Array(length);
-  const temporalStrength = temporalDither?.strength ?? 0;
+  const remap = temporal?.remap ?? null;
 
-  const initializeRow = (y: number): void => {
+  // Snapshot palette channels so the hot loop avoids per-pixel array lookups
+  // through nested color tuples.
+  const paletteLength = palette.length;
+  const reds = new Uint8Array(paletteLength);
+  const greens = new Uint8Array(paletteLength);
+  const blues = new Uint8Array(paletteLength);
+  const alphas = new Uint8Array(paletteLength);
+  for (let i = 0; i < paletteLength; i++) {
+    const color = colorAt(palette, i);
+    reds[i] = red(color);
+    greens[i] = green(color);
+    blues[i] = blue(color);
+    alphas[i] = alpha(color);
+  }
+
+  const rowLength = resolvedWidth * channels;
+  const pixels = opts.dither
+    ? acquireScratch(rowLength * Math.min(2, resolvedHeight))
+    : null;
+  const index = new Uint8Array(length);
+
+  const initializeRow = (target: Float32Array, y: number): void => {
     const rowOffset = (y % 2) * rowLength;
     for (let x = 0; x < resolvedWidth; x++) {
       const sourceOffset = (y * resolvedWidth + x) * 4;
-      const errorOffset = (y * resolvedWidth + x) * channels;
       const scratchOffset = rowOffset + x * channels;
-      pixels[scratchOffset] =
-        byteAt(rgba, sourceOffset) +
-        (temporalErrors
-          ? (temporalErrors[errorOffset] ?? 0) * temporalStrength
-          : 0);
-      pixels[scratchOffset + 1] =
-        byteAt(rgba, sourceOffset + 1) +
-        (temporalErrors
-          ? (temporalErrors[errorOffset + 1] ?? 0) * temporalStrength
-          : 0);
-      pixels[scratchOffset + 2] =
-        byteAt(rgba, sourceOffset + 2) +
-        (temporalErrors
-          ? (temporalErrors[errorOffset + 2] ?? 0) * temporalStrength
-          : 0);
-      if (hasAlpha)
-        pixels[scratchOffset + 3] =
-          byteAt(rgba, sourceOffset + 3) +
-          (temporalErrors
-            ? (temporalErrors[errorOffset + 3] ?? 0) * temporalStrength
-            : 0);
-    }
-    if (temporalErrors) {
-      pixels.copyWithin(
-        diffusionLength + rowOffset,
-        rowOffset,
-        rowOffset + rowLength,
-      );
+      target[scratchOffset] = byteAt(rgba, sourceOffset);
+      target[scratchOffset + 1] = byteAt(rgba, sourceOffset + 1);
+      target[scratchOffset + 2] = byteAt(rgba, sourceOffset + 2);
+      if (hasAlpha) target[scratchOffset + 3] = byteAt(rgba, sourceOffset + 3);
     }
   };
 
-  initializeRow(0);
-  if (resolvedHeight > 1) initializeRow(1);
+  if (pixels) {
+    initializeRow(pixels, 0);
+    if (resolvedHeight > 1) initializeRow(pixels, 1);
+  }
 
   for (let y = 0; y < resolvedHeight; y++) {
     const reverse = serpentine && y % 2 === 1;
@@ -123,49 +121,96 @@ export function applyPaletteDither(
 
     for (let x = xStart; x !== xEnd; x += step) {
       const idx = y * resolvedWidth + x;
-      const pixelOffset = idx * channels;
       const scratchOffset = rowOffset + x * channels;
-      const r = clampByte(pixels[scratchOffset] ?? 0);
-      const g = clampByte(pixels[scratchOffset + 1] ?? 0);
-      const b = clampByte(pixels[scratchOffset + 2] ?? 0);
-      const a = hasAlpha ? clampByte(pixels[scratchOffset + 3] ?? 0xff) : 0xff;
-      const paletteIndex = nearest(r, g, b, a);
-      const color = palette[paletteIndex];
-      if (!color) {
-        throw new Error(
-          "applyPalette() expected a non-empty palette when dithering",
-        );
+      let r: number;
+      let g: number;
+      let b: number;
+      let a: number;
+      if (pixels) {
+        r = clampByte(pixels[scratchOffset] ?? 0);
+        g = clampByte(pixels[scratchOffset + 1] ?? 0);
+        b = clampByte(pixels[scratchOffset + 2] ?? 0);
+        a = hasAlpha ? clampByte(pixels[scratchOffset + 3] ?? 0xff) : 0xff;
+      } else {
+        r = byteAt(rgba, idx * 4);
+        g = byteAt(rgba, idx * 4 + 1);
+        b = byteAt(rgba, idx * 4 + 2);
+        a = hasAlpha ? byteAt(rgba, idx * 4 + 3) : 0xff;
+      }
+      let paletteIndex = nearest(r, g, b, a);
+
+      if (temporal) {
+        // Temporal stabilization: keep the previous frame's color for static
+        // pixels when it is nearly as close as the best match. Spatial
+        // diffusion then absorbs the small extra error, so dither patterns
+        // stop churning between frames without shifting local average color.
+        // Fully transparent targets always take the palette's transparent
+        // entry (see createPaletteLookup); history must not override that.
+        if (
+          remap &&
+          !(hasAlpha && a === 0) &&
+          (temporal.pixelThresholdSq === Infinity ||
+            sourceDistanceSq(
+              rgba,
+              idx * 4,
+              temporal.source,
+              idx * channels,
+              channels,
+            ) <= temporal.pixelThresholdSq)
+        ) {
+          const previousIndex = remap[temporal.indexes[idx] ?? 0] ?? 0;
+          if (previousIndex !== paletteIndex) {
+            const best = colorDistanceSq(
+              reds,
+              greens,
+              blues,
+              alphas,
+              paletteIndex,
+              r,
+              g,
+              b,
+              a,
+              hasAlpha,
+            );
+            const previous = colorDistanceSq(
+              reds,
+              greens,
+              blues,
+              alphas,
+              previousIndex,
+              r,
+              g,
+              b,
+              a,
+              hasAlpha,
+            );
+            const separation = paletteDistanceSq(
+              reds,
+              greens,
+              blues,
+              alphas,
+              paletteIndex,
+              previousIndex,
+              hasAlpha,
+            );
+            if (
+              Math.sqrt(previous) - Math.sqrt(best) <=
+              temporal.tolerance * Math.sqrt(separation)
+            ) {
+              paletteIndex = previousIndex;
+            }
+          }
+        }
+        temporal.indexes[idx] = paletteIndex;
       }
 
       index[idx] = paletteIndex;
-      const er = r - red(color);
-      const eg = g - green(color);
-      const eb = b - blue(color);
-      const ea = hasAlpha ? a - alpha(color) : 0;
 
-      if (temporalDither && temporalErrors) {
-        // The initialized Float32 values exclude spatial diffusion, as required
-        // for temporal history. Keep just two rows alongside the diffusion rows.
-        const originalOffset = diffusionLength + scratchOffset;
-        const tr = clampByte(pixels[originalOffset] ?? 0);
-        const tg = clampByte(pixels[originalOffset + 1] ?? 0);
-        const tb = clampByte(pixels[originalOffset + 2] ?? 0);
-        const ta = hasAlpha
-          ? clampByte(pixels[originalOffset + 3] ?? 0xff)
-          : 0xff;
-        storeTemporalError(
-          temporalErrors,
-          pixelOffset,
-          temporalDither,
-          channels,
-          tr - red(color),
-          tg - green(color),
-          tb - blue(color),
-          hasAlpha ? ta - alpha(color) : 0,
-        );
-      }
-
-      if (opts.dither) {
+      if (pixels) {
+        // A fully transparent output shows no color, so its RGB difference is
+        // not a visible error and must not bleed into opaque neighbors.
+        const chosenAlpha = alphas[paletteIndex] ?? 0xff;
+        const invisible = hasAlpha && chosenAlpha === 0;
         diffuseError(
           pixels,
           channels,
@@ -175,20 +220,21 @@ export function applyPaletteDither(
           y + 1 < resolvedHeight ? rowLength - rowOffset : -1,
           reverse,
           ditherStrength,
-          er,
-          eg,
-          eb,
-          ea,
+          invisible ? 0 : r - (reds[paletteIndex] ?? 0),
+          invisible ? 0 : g - (greens[paletteIndex] ?? 0),
+          invisible ? 0 : b - (blues[paletteIndex] ?? 0),
+          hasAlpha ? a - chosenAlpha : 0,
         );
       }
     }
-    if (y + 2 < resolvedHeight) initializeRow(y + 2);
+    if (pixels && y + 2 < resolvedHeight) initializeRow(pixels, y + 2);
   }
 
   if (temporalDither) {
-    commitTemporalDitherFrame(
+    commitTemporalFrame(
       temporalDither,
       rgba,
+      palette,
       format,
       resolvedWidth,
       resolvedHeight,
@@ -199,28 +245,50 @@ export function applyPaletteDither(
   return index;
 }
 
-function storeTemporalError(
-  errors: Float32Array,
-  offset: number,
-  state: NonNullable<NormalizedApplyPaletteOptions["temporalDither"]>,
-  channels: number,
-  er: number,
-  eg: number,
-  eb: number,
-  ea: number,
-): void {
-  errors[offset] = clampError(er * state.decay, state.maxError);
-  errors[offset + 1] = clampError(eg * state.decay, state.maxError);
-  errors[offset + 2] = clampError(eb * state.decay, state.maxError);
-  if (channels === 4) {
-    errors[offset + 3] = clampError(ea * state.decay, state.maxError);
+function colorDistanceSq(
+  reds: Uint8Array,
+  greens: Uint8Array,
+  blues: Uint8Array,
+  alphas: Uint8Array,
+  i: number,
+  r: number,
+  g: number,
+  b: number,
+  a: number,
+  hasAlpha: boolean,
+): number {
+  const dr = (reds[i] ?? 0) - r;
+  const dg = (greens[i] ?? 0) - g;
+  const db = (blues[i] ?? 0) - b;
+  let distance = dr * dr + dg * dg + db * db;
+  if (hasAlpha) {
+    const da = (alphas[i] ?? 0xff) - a;
+    distance += da * da;
   }
+  return distance;
 }
 
-function clampError(value: number, maxError: number): number {
-  if (value < -maxError) return -maxError;
-  if (value > maxError) return maxError;
-  return value;
+function paletteDistanceSq(
+  reds: Uint8Array,
+  greens: Uint8Array,
+  blues: Uint8Array,
+  alphas: Uint8Array,
+  i: number,
+  j: number,
+  hasAlpha: boolean,
+): number {
+  return colorDistanceSq(
+    reds,
+    greens,
+    blues,
+    alphas,
+    i,
+    reds[j] ?? 0,
+    greens[j] ?? 0,
+    blues[j] ?? 0,
+    alphas[j] ?? 0xff,
+    hasAlpha,
+  );
 }
 
 function diffuseError(
