@@ -7,16 +7,19 @@
     <style>
       :root {
         color-scheme: light;
-        --page: #f7f8f5;
+        --page: #f6f6f6;
         --surface: #ffffff;
-        --surface-alt: #eef3f0;
-        --border: #cfd9d4;
-        --text: #202724;
-        --muted: #65736e;
-        --accent: #0f7b6c;
-        --accent-strong: #0b5f55;
-        --warning: #946b1f;
-        --shadow: 0 10px 30px rgb(31 42 38 / 10%);
+        --surface-alt: #f0f0f0;
+        --border: #d6d6d6;
+        --text: #1a1a1a;
+        --muted: #666666;
+        --accent: #1a1a1a;
+        --accent-strong: #1a1a1a;
+        --selected: #e6e6e6;
+        --track: #e0e0e0;
+        --disabled: #e6e6e6;
+        --disabled-text: #8a8a8a;
+        --shadow: 0 1px 2px rgb(0 0 0 / 6%);
       }
 
       * {
@@ -105,8 +108,8 @@
 
       .button:disabled {
         border-color: var(--border);
-        background: #d9dfdc;
-        color: #79847f;
+        background: var(--disabled);
+        color: var(--disabled-text);
         cursor: not-allowed;
       }
 
@@ -129,11 +132,11 @@
         overflow: hidden;
         border: 0;
         border-radius: 999px;
-        background: #dde5e1;
+        background: var(--track);
       }
 
       progress::-webkit-progress-bar {
-        background: #dde5e1;
+        background: var(--track);
       }
 
       progress::-webkit-progress-value {
@@ -186,12 +189,13 @@
       }
 
       .media-frame {
+        position: relative;
         margin: 16px 18px 18px;
         overflow: hidden;
         border: 1px solid var(--border);
         border-radius: 8px;
-        background: #101514;
-        aspect-ratio: 606 / 320;
+        background: #111111;
+        aspect-ratio: var(--source-aspect, 606 / 320);
       }
 
       video,
@@ -200,7 +204,33 @@
         width: 100%;
         height: 100%;
         object-fit: contain;
-        background: #101514;
+        background: #111111;
+      }
+
+      .roi {
+        position: absolute;
+        border: 2px dashed #ffffff;
+        box-shadow: 0 0 0 1px rgb(0 0 0 / 50%);
+        border-radius: 4px;
+        pointer-events: none;
+      }
+
+      .roi span {
+        position: absolute;
+        top: 100%;
+        left: -2px;
+        margin-top: 4px;
+        border-radius: 4px;
+        padding: 0 6px;
+        background: #ffffff;
+        color: #111111;
+        font-size: 0.72rem;
+        font-weight: 700;
+        white-space: nowrap;
+      }
+
+      a.tag {
+        text-decoration: none;
       }
 
       .metric-grid {
@@ -212,6 +242,10 @@
         border: 1px solid var(--border);
         border-radius: 8px;
         background: var(--border);
+      }
+
+      .metric:last-child:nth-child(odd) {
+        grid-column: 1 / -1;
       }
 
       .metric {
@@ -352,47 +386,249 @@
         place-items: center;
         width: 100%;
         height: 100%;
-        color: #c9d2ce;
+        color: #b5b5b5;
         padding: 18px;
         text-align: center;
       }
 
+      .data-table {
+        margin-top: 32px;
+      }
+
+      .table-toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        align-items: center;
+      }
+
+      .table-toolbar h2 {
+        margin-right: auto;
+        font-size: 1.25rem;
+      }
+
+      .input {
+        width: min(280px, 100%);
+        min-height: 36px;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 0 12px;
+        background: var(--surface);
+        color: var(--text);
+      }
+
+      .input:focus-visible,
+      .button:focus-visible,
+      .sort-button:focus-visible,
+      .menu summary:focus-visible,
+      input[type="checkbox"]:focus-visible {
+        outline: 2px solid var(--text);
+        outline-offset: 2px;
+      }
+
+      .button.small {
+        min-height: 36px;
+        padding: 0 12px;
+        font-weight: 600;
+      }
+
+      .menu {
+        position: relative;
+      }
+
+      .menu summary {
+        display: inline-flex;
+        align-items: center;
+        list-style: none;
+      }
+
+      .menu summary::-webkit-details-marker {
+        display: none;
+      }
+
+      .menu-panel {
+        position: absolute;
+        top: calc(100% + 6px);
+        right: 0;
+        z-index: 10;
+        display: grid;
+        min-width: 190px;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 4px;
+        background: var(--surface);
+        box-shadow: 0 6px 20px rgb(0 0 0 / 12%);
+      }
+
+      .menu-panel label {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        border-radius: 4px;
+        padding: 6px 8px;
+        cursor: pointer;
+        font-size: 0.9rem;
+      }
+
+      .menu-panel label:hover {
+        background: var(--surface-alt);
+      }
+
       .table-wrap {
-        margin-top: 24px;
+        margin-top: 12px;
         overflow-x: auto;
         border: 1px solid var(--border);
         border-radius: 8px;
         background: var(--surface);
-        box-shadow: var(--shadow);
       }
 
       table {
         width: 100%;
-        min-width: 1180px;
         border-collapse: collapse;
+        font-size: 0.92rem;
       }
 
       th,
       td {
-        padding: 12px 14px;
+        height: 44px;
+        padding: 8px 12px;
         border-bottom: 1px solid var(--border);
+        background: var(--surface);
         text-align: left;
-        vertical-align: top;
+        vertical-align: middle;
       }
 
       th {
         color: var(--muted);
-        background: var(--surface-alt);
-        font-size: 0.78rem;
-        text-transform: uppercase;
+        font-weight: 600;
+        white-space: nowrap;
       }
 
       tbody tr:last-child td {
         border-bottom: 0;
       }
 
+      tbody tr:hover td {
+        background: var(--surface-alt);
+      }
+
+      tbody tr[data-state="selected"] td {
+        background: var(--selected);
+      }
+
+      tr.reference td {
+        color: var(--muted);
+      }
+
+      .col-select {
+        position: sticky;
+        left: 0;
+        z-index: 1;
+        width: 44px;
+        min-width: 44px;
+        padding-right: 0;
+      }
+
+      .col-name {
+        position: sticky;
+        left: 44px;
+        z-index: 1;
+        min-width: 190px;
+        border-right: 1px solid var(--border);
+        font-weight: 600;
+      }
+
+      .col-palette {
+        min-width: 170px;
+      }
+
+      .col-dither {
+        min-width: 240px;
+      }
+
+      th.num,
+      td.num {
+        text-align: right;
+        font-variant-numeric: tabular-nums;
+        white-space: nowrap;
+      }
+
+      th.num .sort-button {
+        flex-direction: row-reverse;
+      }
+
+      .sort-button {
+        display: inline-flex;
+        gap: 6px;
+        align-items: center;
+        margin: 0 -6px;
+        border: 0;
+        border-radius: 4px;
+        padding: 4px 6px;
+        background: transparent;
+        color: inherit;
+        cursor: pointer;
+        font-weight: 600;
+      }
+
+      .sort-button:hover {
+        background: var(--surface-alt);
+        color: var(--text);
+      }
+
+      .sort-icon {
+        width: 0.8em;
+        color: var(--disabled-text);
+        text-align: center;
+      }
+
+      th[aria-sort] .sort-button {
+        color: var(--text);
+      }
+
+      th[aria-sort] .sort-icon {
+        color: var(--text);
+      }
+
+      td .best {
+        font-weight: 750;
+        text-decoration: underline;
+        text-decoration-thickness: 2px;
+        text-underline-offset: 4px;
+      }
+
       .pending {
-        color: var(--warning);
+        color: var(--muted);
+        font-style: italic;
+      }
+
+      .running .pending {
+        color: var(--text);
+        font-weight: 600;
+      }
+
+      .table-footer {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        align-items: center;
+        justify-content: space-between;
+        margin-top: 10px;
+        color: var(--muted);
+        font-size: 0.9rem;
+      }
+
+      .legend {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 6px 24px;
+        margin-top: 12px;
+        color: var(--muted);
+        font-size: 0.9rem;
+      }
+
+      .legend strong {
+        color: var(--text);
       }
 
       .download-link {
@@ -435,7 +671,7 @@
         place-items: center;
         width: 100%;
         height: 100%;
-        color: #c9d2ce;
+        color: #b5b5b5;
         padding: 16px;
         text-align: center;
       }
@@ -496,6 +732,14 @@
           <button class="button" id="run-button" type="button" disabled>
             Run benchmark
           </button>
+          <button
+            class="button secondary"
+            id="copy-button"
+            type="button"
+            disabled
+          >
+            Copy as Markdown
+          </button>
           <button class="button secondary" id="reset-button" type="button">
             Reset
           </button>
@@ -515,13 +759,14 @@
           </div>
           <div class="media-frame">
             <video id="source-video" controls loop muted playsinline></video>
+            <div class="roi" id="source-roi" hidden><span>sky ROI</span></div>
           </div>
         </article>
 
         <article class="panel">
           <div class="panel-header">
             <h2>Source Metrics</h2>
-            <span class="tag" id="source-url">bench fixture</span>
+            <a class="tag" id="source-url" href="#">bench fixture</a>
           </div>
           <dl class="metric-grid" id="source-metrics"></dl>
         </article>
@@ -570,28 +815,58 @@
         </div>
       </section>
 
-      <section class="table-wrap" aria-label="Benchmark file sizes">
-        <table>
-          <thead>
-            <tr>
-              <th>Output</th>
-              <th>Dimensions</th>
-              <th>Frames</th>
-              <th>FPS</th>
-              <th>Palette</th>
-              <th>Dither</th>
-              <th>Size</th>
-              <th>MP4 Ratio</th>
-              <th>Sky Error</th>
-              <th>Sky Flicker</th>
-              <th>Sky Colors</th>
-              <th>Encode Time</th>
-              <th>Download</th>
-            </tr>
-          </thead>
-          <tbody id="results-body"></tbody>
-        </table>
+      <section class="data-table" aria-labelledby="results-heading">
+        <div class="table-toolbar">
+          <h2 id="results-heading">Results</h2>
+          <input
+            class="input"
+            id="table-filter"
+            type="search"
+            placeholder="Filter outputs..."
+            aria-label="Filter outputs"
+          />
+          <details class="menu" id="column-menu">
+            <summary class="button secondary small">Columns</summary>
+            <div class="menu-panel" id="column-menu-panel"></div>
+          </details>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead id="results-head"></thead>
+            <tbody id="results-body"></tbody>
+          </table>
+        </div>
+        <div class="table-footer">
+          <p id="selection-summary" aria-live="polite"></p>
+          <button
+            class="button secondary small"
+            id="compare-selected"
+            type="button"
+            disabled
+          >
+            Compare selected
+          </button>
+        </div>
       </section>
+      <div class="legend">
+        <p>
+          <strong>Sky error</strong>: mean RGB distance between source and GIF
+          pixels inside the sky ROI. Lower is closer to the source.
+        </p>
+        <p>
+          <strong>Sky flicker</strong>: mean frame-to-frame change in that
+          error. Lower means calmer dithering in flat areas.
+        </p>
+        <p>
+          <strong>Sky colors</strong>: average distinct palette colors used in
+          the ROI per frame.
+        </p>
+        <p>
+          <strong>Underlined</strong> values are the best size, error, flicker,
+          and encode time among finished outputs. Select two rows to compare
+          them side by side.
+        </p>
+      </div>
 
       <section
         class="result-grid"
