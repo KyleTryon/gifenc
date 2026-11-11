@@ -17,7 +17,7 @@ jobs:
   publish:
     name: Publish npm package
     if: github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     needs: validate
     timeout-minutes: 20
     permissions:
@@ -28,14 +28,14 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
 
       - name: Set up Node.js
-        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: 24
+          node-version-file: .node-version
           registry-url: https://registry.npmjs.org
           package-manager-cache: false
 
@@ -51,7 +51,7 @@ jobs:
 
       - name: Set up pnpm
         if: steps.release.outputs.release_needed == 'true'
-        uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6
+        uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
 
       - name: Install dependencies
         if: steps.release.outputs.release_needed == 'true'
@@ -113,7 +113,7 @@ jobs:
 
       - name: Create GitHub release
         if: steps.version.outputs.tag != '' || steps.release.outputs.latest_tag != ''
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           TAG: ${{ steps.version.outputs.tag || steps.release.outputs.latest_tag }}
         with:

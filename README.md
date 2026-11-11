@@ -526,8 +526,12 @@ the GIF variants. Once deployed, open:
 
 ## Development
 
-Use Node.js 24.16.0 LTS with pnpm 11 for local development. The tooling supports
+Use Node.js 26.13.0 LTS with pnpm 12.18.0 for local development. The tooling supports
 Node.js 22.13.0 and newer.
+
+Tooling migration: this repository now requires pnpm 12 instead of pnpm 11 and
+uses Node.js 26 LTS by default. Install the pinned tools before developing. The
+published encoder API and minimum supported Node.js version are unchanged.
 
 ```sh
 pnpm install
@@ -557,9 +561,11 @@ a minor release, and `fix`, `perf`, or `security` commits create a patch
 release.
 
 Pull requests and pushes to `main` run the full checks, package-consumer smoke
-tests, and benchmark-site build on Node.js 22.13.0, 24, and 26. CI also audits
-development dependencies. TypeScript stays on 6.x; its next major upgrade is
-deferred.
+tests, and benchmark-site build on Ubuntu 26.04 with Node.js 22.13.0, 24, and 26.
+CI also audits development dependencies. TypeScript stays on 6.0.3 because the
+latest stable `typescript-eslint` supports TypeScript versions below 6.1. The
+Dependabot major version exclusion can be removed once the lint tooling supports
+TypeScript 7.
 
 Releases require that validation matrix to pass, validate the bumped package,
 and publish the checked archive before atomically pushing the release commit and
