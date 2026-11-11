@@ -3,6 +3,7 @@ import { readFile, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { PNG } from "pngjs";
+import { GifReader } from "omggif";
 import { BENCH_FORMATS, BENCH_IMAGE_FIXTURES } from "../fixtures/index.js";
 
 const [baselinePath, candidatePath, outputPath, stage = "all"] =
@@ -49,16 +50,21 @@ for (const fixture of BENCH_IMAGE_FIXTURES) {
       return encoder.bytesView();
     };
     assert.deepEqual(
-      encode(candidate),
-      encode(baseline),
-      `${fixture.id}/${format}: GIF bytes changed`,
+      decodedGIF(encode(candidate)),
+      decodedGIF(encode(baseline)),
+      `${fixture.id}/${format}: decoded GIF changed`,
+    );
+    assert.deepEqual(
+      decodedGIF(tinyEncode(candidate)),
+      decodedGIF(tinyEncode(baseline)),
+      `${fixture.id}/${format}: decoded tiny GIF changed`,
     );
     const operations =
       stage === "quantize"
         ? ["quantize"]
         : stage === "mapping"
           ? ["applyPalette", "reusedMapper"]
-          : ["applyPalette", "encode", "tinyEncode"];
+          : ["quantize", "applyPalette", "dither", "encode", "tinyEncode"];
     const mapper = candidate.createPaletteMapper?.(palette, format);
     if (mapper) {
       assert.deepEqual(
@@ -80,6 +86,10 @@ for (const fixture of BENCH_IMAGE_FIXTURES) {
       applyPalette: [
         () => baseline.applyPalette(image.data, palette, format),
         () => candidate.applyPalette(image.data, palette, format),
+      ],
+      dither: [
+        () => baseline.applyPalette(image.data, palette, options),
+        () => candidate.applyPalette(image.data, palette, options),
       ],
       reusedMapper: [
         () => baseline.applyPalette(image.data, palette, format),
@@ -130,7 +140,7 @@ await writeFile(
       node: process.version,
       platform: `${process.platform}/${process.arch}`,
       quality:
-        "identical palettes, indexes, dithered indexes, and GIF bytes for every fixture and format",
+        "identical palettes, indexes, dithered indexes, and decoded GIF pixels and frame metadata for every fixture and format",
       rows,
     },
     null,
@@ -143,4 +153,40 @@ function tinyEncode(api) {
   encoder.writeFrame(new Uint8Array([0]), 1, 1, { palette: [[1, 2, 3]] });
   encoder.finish();
   return encoder.bytesView();
+}
+
+function decodedGIF(bytes) {
+  const reader = new GifReader(bytes);
+  const frames = [];
+  for (let i = 0; i < reader.numFrames(); i++) {
+    const {
+      x,
+      y,
+      width,
+      height,
+      delay,
+      disposal,
+      transparent_index,
+      interlaced,
+    } = reader.frameInfo(i);
+    const pixels = new Uint8Array(reader.width * reader.height * 4);
+    reader.decodeAndBlitFrameRGBA(i, pixels);
+    frames.push({
+      x,
+      y,
+      width,
+      height,
+      delay,
+      disposal,
+      transparent_index,
+      interlaced,
+      pixels,
+    });
+  }
+  return {
+    width: reader.width,
+    height: reader.height,
+    loopCount: reader.loopCount(),
+    frames,
+  };
 }

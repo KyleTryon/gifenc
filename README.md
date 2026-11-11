@@ -37,6 +37,7 @@ import {
   quantize,
   applyPalette,
   createTemporalDither,
+  createTemporalDitherSequence,
 } from "@techsquidtv/gifenc";
 ```
 
@@ -48,6 +49,7 @@ import {
   quantize,
   applyPalette,
   createTemporalDither,
+  createTemporalDitherSequence,
 } from "https://unpkg.com/@techsquidtv/gifenc/dist/gifenc.mjs";
 ```
 
@@ -86,6 +88,45 @@ for (const frame of frames) {
 gif.finish();
 const bytes = gif.bytes();
 ```
+
+## Animation timing
+
+GIF delays have 10 ms resolution. Passing `1000 / fps` directly as each
+`writeFrame` delay rounds every frame independently and can accumulate drift.
+Use `frameDelay(startMs, endMs)` to round consecutive boundaries instead:
+
+```js
+import { frameDelay } from "@techsquidtv/gifenc";
+
+const fps = 12;
+const durationMs = 15000;
+const frameCount = Math.ceil((durationMs * fps) / 1000);
+for (let i = 0; i < frameCount; i++) {
+  const start = (i * 1000) / fps;
+  const end = Math.min(((i + 1) * 1000) / fps, durationMs);
+  gif.writeFrame(indexedFrames[i], width, height, {
+    palette: i === 0 ? palette : undefined,
+    delay: frameDelay(start, end),
+  });
+}
+```
+
+Use boundaries relative to one sequence origin; the final boundary can be the
+actual clip end, including a partial frame. With source timestamps, use each
+retained frame's timestamp and the next retained timestamp as its boundaries,
+then use the clip end for the last frame. If frames are skipped, this holds the
+preceding retained frame over the gap; intentionally removing time instead
+requires a new contiguous output timeline. Each interval and resulting delay
+must fit the encoder's per-frame limit (655350 ms); split longer holds into
+multiple frames. Zero delays can occur for short intervals, and viewers may
+clamp them or apply their own playback timing. The helper preserves total
+encoded duration to the nearest 10 ms, not necessarily actual viewer timing.
+
+For Cliparr, after a gifenc release containing this helper, replace the repeated
+`1000 / frameRate` delay with boundaries computed from output frame indices and
+the clip duration, or from retained frame timestamps as above. Keep a partial
+last frame and account for skipped frames according to the intended timeline.
+The low-level `writeFrame` delay contract remains unchanged.
 
 ## Dithering
 
@@ -179,6 +220,27 @@ Returns a palette such as:
 ];
 ```
 
+### `createPaletteSampler(maxSamples, samplesPerFrame)`
+
+Build a shared palette from caller-selected RGBA frames without retaining or
+concatenating the full frames:
+
+```js
+const sampler = createPaletteSampler(120_000, 5_000);
+for (const frame of selectedFrames) sampler.addFrame(frame?.data);
+const palette = sampler.quantize(256, { format: "rgb565" });
+```
+
+The sampler owns a fixed `maxSamples * 4` byte buffer. It samples at most
+`samplesPerFrame` pixels across each complete frame, varying sample positions
+within strata to reduce regular-pattern aliasing. Sampling is deterministic, but
+cannot guarantee representation of every color. Missing and empty frames add
+nothing; a full sampler ignores later frames. Select frames and divide the budget
+among them in the caller to avoid favoring early frames. `addFrame` returns the
+number of pixels added. `quantize` accepts the same options and returns the same
+RGB or RGBA palette format as `quantize`; it returns `[]` if no pixels were added.
+Input is RGBA byte data, including for RGB palette formats.
+
 ### `applyPalette(rgba, palette, options)`
 
 Maps RGBA pixels to palette indexes.
@@ -213,7 +275,68 @@ do not affect the snapshot; create a new mapper to use a new palette.
 cache is cleared before inserting another color, bounding memory across long
 animations. Call `reset()` to release cached entries while keeping the snapshot.
 Cache eviction and reset affect speed only. Larger limits can improve repeated
-high-color frames at the cost of retained memory.
+high-color frames at the cost of retained memory. Measure on your own frames:
+changing colors, a small cache, or low-color input can erase the benefit. Run
+`pnpm run build:esm && node bench/node/mapper.mjs` (requires ffmpeg) for a
+multi-frame comparison, including exact index checks and cache resets.
+
+For a shared-palette animation, quantize a representative sample once, then
+construct one mapper per worker and palette and reuse it for that worker's frames.
+Use [`shared-palette-worker.js`](./examples/browser/shared-palette-worker.js)
+with the existing worker pool by passing
+`workerUrl: "/examples/browser/shared-palette-worker.js"`. It uses the same
+initialization, cumulative per-frame delays, transferable chunk messages, and
+ordered assembly as the default worker. The first frame assigned to each worker
+initializes its mapper; subsequent frames reuse it with the same global palette.
+The example pool derives that palette from frame zero. Application pipelines can
+use `createPaletteSampler` to build representative shared palettes. Start a new
+worker job when the palette changes. For spatial or temporal dithering, use
+`applyPalette` with its dithering options instead.
+
+Cliparr users: the installed 1.1.0 release does not contain this API. After a
+release containing it is available, upgrade to that release and use the shared
+palette mapper for Compact's non-dithered frames, initialized once per worker.
+Keep the existing dithering path for presets that use temporal history or change
+palettes; validate output and benchmark with representative clips.
+
+### `createTemporalDitherSequence()`
+
+Manages one ordered animation at a time using the same state as
+`createTemporalDither`. Start each animation with its dimensions and settings:
+
+```js
+const sequence = createTemporalDitherSequence();
+const temporalDither = sequence.start({ width, height, format });
+try {
+  for (const frame of frames) {
+    const index = applyPalette(frame.data, palette, {
+      width,
+      height,
+      format,
+      temporalDither,
+    });
+    gif.writeFrame(index, width, height, { palette, delay });
+  }
+} finally {
+  sequence.end();
+}
+```
+
+Process frames sequentially in display order, with one frame in flight. Use a
+separate sequence for each concurrent animation. Call `reset()` at a known cut;
+it requires an active sequence. `end()` clears and releases the active state and
+is safe to repeat. Call `start()` again for a new animation or when dimensions,
+format, or temporal settings change. Starting successfully clears the previous
+state; invalid options leave it active. Do not use a state returned by an earlier
+`start()` after replacement or `end()`: retained references cannot be revoked.
+The direct `createTemporalDither()` API remains available.
+
+For Cliparr, create a sequence per encoding job, start it once using the job's
+resolved dimensions, format and temporal settings, pass the returned state to
+ordered frame mappings, and end it in a `finally` block. Keep spatial-temporal
+jobs on one worker with one frame in flight. Remove the settings-key cache and
+restart the sequence if those settings change. This requires a gifenc release
+containing this API before upgrading Cliparr.
 
 ### `createTemporalDither(options)`
 
@@ -246,8 +369,55 @@ Common methods:
 - `finish()`: writes the GIF trailer.
 - `bytes()`: returns a copied `Uint8Array`.
 - `bytesView()`: returns a direct view into the encoder buffer.
+- `takeBytes()`: releases the output buffer and resets frame state, returning a
+  transferable view without copying the written bytes.
 - `writeHeader()`: writes a header manually when `auto` is disabled.
 - `reset()`: reuses the encoder buffer for another GIF.
+
+`bytes()` is an independent exact-sized copy. `bytesView()` and `buffer` refer
+to encoder-owned storage: writing, growing, or resetting can invalidate the
+view or change its contents. Do not transfer that storage while the encoder
+uses it. `reset()` retains output capacity and compression workspace; views
+from before reset can be overwritten by later writes.
+
+`takeBytes()` transfers ownership of the output storage to the caller and
+resets the encoder as if for a new GIF. It retains the compression workspace,
+but allocates new output storage on subsequent writes. The returned view starts
+at offset zero and its `byteLength` is the written length; its `buffer` can be
+larger, with unused bytes zeroed. Transfer the view together with its buffer,
+not the buffer alone as if its whole capacity were GIF data. Earlier views of
+the released storage still alias it and are detached if its buffer is
+transferred. Finish a complete GIF before taking it; manual chunks need no
+trailer until assembly. The low-level `stream.takeBytes()` only resets the
+stream, not the encoder's frame state.
+
+For example, a worker can retain one encoder per encoding mode and transfer
+each result without copying it:
+
+```js
+const encoder = GIFEncoder(); // keep in the worker, outside the message handler
+// For each independent GIF: write frames and call finish().
+const bytes = encoder.takeBytes();
+postMessage({ bytes }, [bytes.buffer]);
+// The receiver uses bytes.byteOffset and bytes.byteLength; the worker can
+// immediately write a new GIF with encoder.
+```
+
+Cliparr can adopt this after a release by retaining suitable worker encoders,
+returning `takeBytes()` from frame encoding, and changing the worker message
+and receiver to carry the typed-array view (including its length) while
+transferring `bytes.buffer`. This removes both the `bytes()` copy and the
+worker's extra ArrayBuffer copy. Preserve the existing framing and palette
+rules; resetting an encoder does not supply a prior chunk's global palette.
+For final assembly, an owned view can likewise be passed to `Blob` directly;
+Blob construction may itself copy according to the platform.
+
+The low-level `stream.writeBytes(data, offset, byteLength)` and
+`stream.writeBytesView(data, offset, byteLength)` methods default `byteLength` to
+the remaining source after `offset`. Offsets and lengths must be nonnegative
+integers within the source; invalid ranges throw `RangeError` before writing.
+Calls that previously passed out-of-bounds ranges must use valid ranges; they
+now throw instead of truncating, appending unwritten bytes, or partially writing.
 
 Frame options include:
 
@@ -257,7 +427,7 @@ Frame options include:
 - `transparent`: enables one-bit transparency.
 - `transparentIndex`: palette index to treat as transparent.
 - `dispose`: GIF disposal method override.
-- `colorDepth`: integer from `1` to `8`, large enough for the active palette.
+- `colorDepth`: integer from `1` to `8`, large enough for the active palette. By default, compression uses the minimum depth for the active palette (at least 2 bits for GIF LZW), while the logical screen color resolution remains 8 bits. An explicit value also sets the logical screen color resolution on the first frame.
 
 Dimensions must be integers from `1` to `65535`. Later frames must fit within
 the first frame's logical screen. Every pixel index, and an enabled transparent
@@ -289,9 +459,21 @@ encoding can be split across frames.
 A common pattern:
 
 - Send RGBA frame data to workers.
-- In each worker, call `quantize`, `applyPalette`, and `GIFEncoder`.
+- Share the global palette with every worker; map pixels with `applyPalette`.
+- Call `encodeFrameChunk` with `sequenceIndex` and `globalPalette`.
+  The first frame uses that palette; later frames may supply a local `palette`.
 - Return encoded frame chunks to the main thread.
-- Combine chunks into one final GIF stream.
+- Call `assembleFrameChunks(chunks, encodedFrameCount)` once all frames arrive. It orders chunks and
+  rejects missing, duplicate, or inconsistent sequence and palette context.
+
+Chunks are serializable worker messages; transfer `chunk.bytes.buffer` and treat
+chunk metadata and bytes as immutable trusted output from `encodeFrameChunk`.
+For Cliparr Compact exports, after a gifenc release containing this API, pass
+the same global palette to every frame chunk and omit `palette` on later frames.
+Assign dense sequence indexes only to frames successfully read, then pass the final
+encoded frame count to assembly after all work completes.
+Assemble the returned chunks instead of concatenating manual encoder streams.
+Per-frame palette exports can pass each later frame’s palette as `palette`.
 
 See the local worker example:
 

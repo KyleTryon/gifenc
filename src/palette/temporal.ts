@@ -4,6 +4,7 @@ import type {
   Format,
   RGBAInput,
   TemporalDitherOptions,
+  TemporalDitherSequence,
   TemporalDitherState,
 } from "../types.js";
 
@@ -88,6 +89,28 @@ export function createTemporalDither(
   options: TemporalDitherOptions,
 ): TemporalDitherState {
   return new TemporalDither(options);
+}
+
+/** Manage temporal history across explicitly bounded animation sequences. */
+export function createTemporalDitherSequence(): TemporalDitherSequence {
+  let state: TemporalDitherState | undefined;
+  return {
+    start(options) {
+      const next = createTemporalDither(options);
+      state?.reset();
+      state = next;
+      return next;
+    },
+    reset() {
+      if (!state)
+        throw new Error("Temporal dither sequence has not been started");
+      state.reset();
+    },
+    end() {
+      state?.reset();
+      state = undefined;
+    },
+  };
 }
 
 export function temporalDitherChannels(format: Format): 3 | 4 {
