@@ -7,6 +7,7 @@ import {
   nearestColorIndex,
   nearestColorIndexWithDistance,
   quantize,
+  createPaletteSampler,
   type ApplyPaletteOptions,
   type Color,
   type Palette,
@@ -127,3 +128,9 @@ createTemporalDither({
 
 void invalidColor;
 void invalidPalette;
+
+const sampler = createPaletteSampler(100, 10);
+sampler.addFrame(rgbaData);
+sampler.addFrame(null);
+const sampledPalette: Palette = sampler.quantize(16, { format: "rgba4444" });
+void sampledPalette;

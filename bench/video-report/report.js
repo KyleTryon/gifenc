@@ -4,6 +4,7 @@ import {
   createTemporalDither,
   frameDelay,
   quantize,
+  createPaletteSampler,
 } from "../../dist/gifenc.mjs";
 import { BENCH_VIDEO_FIXTURES, fixtureUrl } from "../../fixtures/index.js";
 
@@ -322,12 +323,18 @@ async function encodeVariant(metadata, frames, variant, onProgress) {
     }
   }
 
-  const sharedPalette =
-    variant.paletteStrategy === "shared"
-      ? quantize(mergeFrames(selectedFrames), variant.colors, {
-          format: variant.format,
-        })
-      : null;
+  let sharedPalette = null;
+  if (variant.paletteStrategy === "shared") {
+    const maxSamples = 120_000;
+    const sampler = createPaletteSampler(
+      maxSamples,
+      Math.max(1, Math.floor(maxSamples / selectedFrames.length)),
+    );
+    for (const frame of selectedFrames) sampler.addFrame(frame);
+    sharedPalette = sampler.quantize(variant.colors, {
+      format: variant.format,
+    });
+  }
 
   onProgress(0.25);
 
@@ -442,19 +449,6 @@ function scaleFrame(frame, sourceWidth, sourceHeight, scratch) {
     scratch.height,
   );
   return scratch.context.getImageData(0, 0, scratch.width, scratch.height).data;
-}
-
-function mergeFrames(frames) {
-  const length = frames.reduce((total, frame) => total + frame.length, 0);
-  const merged = new Uint8ClampedArray(length);
-  let offset = 0;
-
-  for (const frame of frames) {
-    merged.set(frame, offset);
-    offset += frame.length;
-  }
-
-  return merged;
 }
 
 function renderSourceMetrics(metadata) {

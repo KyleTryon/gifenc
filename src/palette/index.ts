@@ -7,3 +7,5 @@ export {
 } from "./nearest.js";
 export { prequantize } from "./prequantize.js";
 export { createTemporalDither } from "./temporal.js";
+
+export { createPaletteSampler } from "./sampling.js";
