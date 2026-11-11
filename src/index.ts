@@ -11,6 +11,7 @@ export {
   nearestColorIndexWithDistance,
   prequantize,
   createTemporalDither,
+  createTemporalDitherSequence,
   snapColorsToPalette,
 } from "./palette/index.js";
 
@@ -39,6 +40,7 @@ export type {
   RGB,
   TemporalDitherChangeDetectionOptions,
   TemporalDitherOptions,
+  TemporalDitherSequence,
   TemporalDitherState,
   WriteFrameOptions,
 } from "./types.js";
