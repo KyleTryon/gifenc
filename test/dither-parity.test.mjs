@@ -3,10 +3,30 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { applyPalette, createTemporalDither } from "../dist/gifenc.mjs";
 
-// Golden digests were produced by the full-frame diffusion implementation.
+// The rgb565 spatial digest was produced by the original full-frame diffusion
+// implementation and must not change. The rgba4444 spatial digest differs from
+// it only where a fully transparent target now maps to the palette's
+// transparent entry instead of a visible color. Temporal digests pin the
+// temporal stabilization behavior, including scene changes and reset.
+const GOLDEN = {
+  rgb565: {
+    spatial: "096b22d4a54e59ccbd9cfcfe1fa56c15650cb5f6f9d0d0a3262268e03ca503bf",
+    temporal:
+      "b217d41855de42593c8756117f37755e49153547d1ffdf22232e9eea8d791e6f",
+  },
+  rgba4444: {
+    spatial: "24deece767cc7b401187e1bfe9aa8048b0fbb4f201617b312fd2487ee57ed02d",
+    temporal:
+      "4f8e28baf102877bcc6f32beae29ca4d3fbdd0ddd1e2c64bf4fd3679bbd3efc6",
+  },
+};
+
 for (const format of ["rgb565", "rgba4444"]) {
-  test(`dither scanlines preserve full-frame output for ${format}`, () => {
-    const hash = createHash("sha256");
+  test(`dither scanlines preserve golden output for ${format}`, () => {
+    const hashes = {
+      spatial: createHash("sha256"),
+      temporal: createHash("sha256"),
+    };
     const palette = Array.from({ length: 32 }, (_, i) => [
       (i * 37) % 256,
       (i * 91) % 256,
@@ -52,7 +72,7 @@ for (const format of ["rgb565", "rgba4444"]) {
                   frame[i + 3] = (x * 7 + y * 5 + frameNumber * 3) % 256;
                 }
               }
-              hash.update(
+              hashes[temporal ? "temporal" : "spatial"].update(
                 applyPalette(frame, palette, {
                   width,
                   height,
@@ -68,11 +88,12 @@ for (const format of ["rgb565", "rgba4444"]) {
         }
       }
     }
-    assert.equal(
-      hash.digest("hex"),
-      format === "rgb565"
-        ? "ec0489f822db9545286f54a0c62e35138c6945f833c7798946547ab18db6bd29"
-        : "928f275177a35170b267cbcc03b45729e83ca17b7cf36df3bb7c6be392439c22",
+    assert.deepEqual(
+      {
+        spatial: hashes.spatial.digest("hex"),
+        temporal: hashes.temporal.digest("hex"),
+      },
+      GOLDEN[format],
     );
   });
 }

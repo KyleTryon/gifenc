@@ -1,7 +1,8 @@
 import { normalizeFormat } from "../validation.js";
-import { byteAt } from "./utils.js";
+import { alpha, blue, byteAt, colorAt, green, red } from "./utils.js";
 import type {
   Format,
+  Palette,
   RGBAInput,
   TemporalDitherOptions,
   TemporalDitherSequence,
@@ -13,18 +14,50 @@ const DEFAULT_DECAY = 0.75;
 const DEFAULT_MAX_ERROR = 128;
 const DEFAULT_CHANGE_PIXEL_THRESHOLD = 48;
 const DEFAULT_SCENE_CHANGE_RATIO = 0.75;
+/**
+ * How much worse than the best match the previous frame's color may be, per
+ * unit of strength, as a fraction of the distance between the two colors.
+ * Spatial diffusion absorbs the difference, so small values remove most
+ * frame-to-frame dither churn while barely changing local average color.
+ * Measuring relative to the colors' separation keeps the effect consistent
+ * across dense and sparse palettes.
+ */
+const TOLERANCE_PER_STRENGTH = 0.12;
 
-const buffers = new WeakMap<TemporalDither, Float32Array>();
-const previousFrames = new WeakMap<TemporalDither, PreviousFrame>();
+const histories = new WeakMap<TemporalDither, History>();
 
 type ChangeDetection = {
   readonly pixelThreshold: number;
   readonly sceneChangeRatio: number;
 };
 
-type PreviousFrame = {
-  bytes: Uint8Array;
+type History = {
+  /** Palette index chosen for each pixel in the previous frame. */
+  readonly indexes: Uint8Array;
+  /** Previous source pixels, used for change detection. */
+  readonly source: Uint8Array;
+  /** Previous palette as packed RGBA bytes. */
+  readonly palette: Uint8Array;
+  paletteLength: number;
   hasFrame: boolean;
+};
+
+/**
+ * Per-frame view of temporal history used by the dithering loop.
+ *
+ * `remap` maps each previous palette index to the nearest entry of the current
+ * palette, so history survives per-frame palettes. `remap` is `null` when there
+ * is no usable history (first frame, after reset, or after a scene change).
+ */
+export type TemporalFrame = {
+  readonly indexes: Uint8Array;
+  readonly source: Uint8Array;
+  readonly remap: Uint8Array | null;
+  readonly channels: 3 | 4;
+  /** Squared source distance above which a pixel ignores its history. */
+  readonly pixelThresholdSq: number;
+  /** Allowed extra distance as a fraction of the candidates' separation. */
+  readonly tolerance: number;
 };
 
 class TemporalDither implements TemporalDitherState {
@@ -50,38 +83,33 @@ class TemporalDither implements TemporalDitherState {
       DEFAULT_STRENGTH,
       "strength",
     );
+    // Validated and exposed only for compatibility with the earlier
+    // error-carrying algorithm; neither affects output.
+    /* eslint-disable @typescript-eslint/no-deprecated */
     this.decay = normalizeUnit(options.decay, DEFAULT_DECAY, "decay");
     this.maxError = normalizeNonNegative(
       options.maxError,
       DEFAULT_MAX_ERROR,
       "maxError",
     );
+    /* eslint-enable @typescript-eslint/no-deprecated */
     this.changeDetection = normalizeChangeDetection(options.changeDetection);
 
-    buffers.set(
-      this,
-      new Float32Array(
-        this.width * this.height * temporalDitherChannels(this.format),
+    const pixels = this.width * this.height;
+    histories.set(this, {
+      indexes: new Uint8Array(pixels),
+      source: new Uint8Array(
+        this.changeDetection ? pixels * temporalDitherChannels(this.format) : 0,
       ),
-    );
-    if (this.changeDetection) {
-      previousFrames.set(this, {
-        bytes: new Uint8Array(
-          this.width * this.height * temporalDitherChannels(this.format),
-        ),
-        hasFrame: false,
-      });
-    }
+      palette: new Uint8Array(256 * 4),
+      paletteLength: 0,
+      hasFrame: false,
+    });
   }
 
   reset(): void {
-    const buffer = buffers.get(this);
-    if (buffer) buffer.fill(0);
-    const previousFrame = previousFrames.get(this);
-    if (previousFrame) {
-      previousFrame.bytes.fill(0);
-      previousFrame.hasFrame = false;
-    }
+    const history = histories.get(this);
+    if (history) history.hasFrame = false;
   }
 }
 
@@ -117,13 +145,13 @@ export function temporalDitherChannels(format: Format): 3 | 4 {
   return format === "rgba4444" ? 4 : 3;
 }
 
-function getTemporalDitherBuffer(
+function getHistory(
   state: TemporalDitherState,
   format: Format,
   width: number,
   height: number,
   functionName: string,
-): Float32Array {
+): History {
   if (!(state instanceof TemporalDither)) {
     throw new Error(
       `${functionName}() expected temporalDither from createTemporalDither()`,
@@ -140,49 +168,132 @@ function getTemporalDitherBuffer(
     );
   }
 
-  const buffer = buffers.get(state);
-  if (!buffer) {
+  const history = histories.get(state);
+  if (!history) {
     throw new Error(
       `${functionName}() received an invalid temporalDither state`,
     );
   }
-  return buffer;
+  return history;
 }
 
-export function prepareTemporalDitherFrame(
+/**
+ * Validate the state and resolve how the previous frame applies to this one.
+ * The caller must write every pixel's chosen index into `frame.indexes`, then
+ * call {@link commitTemporalFrame}.
+ */
+export function beginTemporalFrame(
   state: TemporalDitherState,
   rgba: RGBAInput,
   format: Format,
   width: number,
   height: number,
+  nearest: (r: number, g: number, b: number, a?: number) => number,
   functionName: string,
-): Float32Array {
-  const buffer = getTemporalDitherBuffer(
-    state,
-    format,
-    width,
-    height,
-    functionName,
-  );
-  rejectChangedHistory(state, rgba, format, buffer);
-  return buffer;
+): TemporalFrame {
+  const history = getHistory(state, format, width, height, functionName);
+  const channels = temporalDitherChannels(format);
+  const changeDetection = state.changeDetection;
+  const pixelThresholdSq = changeDetection
+    ? changeDetection.pixelThreshold * changeDetection.pixelThreshold
+    : Infinity;
+
+  let remap: Uint8Array | null = null;
+  if (
+    history.hasFrame &&
+    !(
+      changeDetection && isSceneChange(history, rgba, channels, changeDetection)
+    )
+  ) {
+    remap = new Uint8Array(history.paletteLength);
+    const previous = history.palette;
+    for (let i = 0, j = 0; i < remap.length; i++, j += 4) {
+      remap[i] = nearest(
+        previous[j] ?? 0,
+        previous[j + 1] ?? 0,
+        previous[j + 2] ?? 0,
+        previous[j + 3] ?? 0xff,
+      );
+    }
+  }
+
+  return {
+    indexes: history.indexes,
+    source: history.source,
+    remap,
+    channels,
+    pixelThresholdSq,
+    tolerance: state.strength * TOLERANCE_PER_STRENGTH,
+  };
 }
 
-export function commitTemporalDitherFrame(
+/** Record this frame's source and palette as history for the next frame. */
+export function commitTemporalFrame(
   state: TemporalDitherState,
   rgba: RGBAInput,
+  palette: Palette,
   format: Format,
   width: number,
   height: number,
   functionName: string,
 ): void {
-  getTemporalDitherBuffer(state, format, width, height, functionName);
-  const temporal = getTemporalDitherState(state, functionName);
-  const previousFrame = previousFrames.get(temporal);
-  if (!previousFrame) return;
+  const history = getHistory(state, format, width, height, functionName);
+  if (state.changeDetection) {
+    copySourceFrame(history.source, rgba, temporalDitherChannels(format));
+  }
+  const length = Math.min(256, palette.length);
+  for (let i = 0, j = 0; i < length; i++, j += 4) {
+    const color = colorAt(palette, i);
+    history.palette[j] = red(color);
+    history.palette[j + 1] = green(color);
+    history.palette[j + 2] = blue(color);
+    history.palette[j + 3] = alpha(color);
+  }
+  history.paletteLength = length;
+  history.hasFrame = true;
+}
 
-  copySourceFrame(previousFrame.bytes, rgba, temporalDitherChannels(format));
-  previousFrame.hasFrame = true;
+function isSceneChange(
+  history: History,
+  rgba: RGBAInput,
+  channels: 3 | 4,
+  changeDetection: ChangeDetection,
+): boolean {
+  const pixelCount = rgba.length / 4;
+  if (pixelCount === 0) return false;
+  const thresholdSq =
+    changeDetection.pixelThreshold * changeDetection.pixelThreshold;
+  const limit = changeDetection.sceneChangeRatio * pixelCount;
+  const previous = history.source;
+  let changed = 0;
+  for (let i = 0, j = 0; i < rgba.length; i += 4, j += channels) {
+    if (
+      sourceDistanceSq(rgba, i, previous, j, channels) > thresholdSq &&
+      ++changed >= limit
+    ) {
+      return true;
+    }
+  }
+  return changed >= limit;
+}
+
+export function sourceDistanceSq(
+  rgba: RGBAInput,
+  rgbaOffset: number,
+  previous: Uint8Array,
+  previousOffset: number,
+  channels: 3 | 4,
+): number {
+  const dr = byteAt(rgba, rgbaOffset) - (previous[previousOffset] ?? 0);
+  const dg = byteAt(rgba, rgbaOffset + 1) - (previous[previousOffset + 1] ?? 0);
+  const db = byteAt(rgba, rgbaOffset + 2) - (previous[previousOffset + 2] ?? 0);
+  let distance = dr * dr + dg * dg + db * db;
+  if (channels === 4) {
+    const da =
+      byteAt(rgba, rgbaOffset + 3) - (previous[previousOffset + 3] ?? 0);
+    distance += da * da;
+  }
+  return distance;
 }
 
 function normalizeDimension(value: unknown, name: string): number {
@@ -240,83 +351,6 @@ function normalizeChangeDetection(
       "changeDetection.sceneChangeRatio",
     ),
   };
-}
-
-function getTemporalDitherState(
-  state: TemporalDitherState,
-  functionName: string,
-): TemporalDither {
-  if (!(state instanceof TemporalDither)) {
-    throw new Error(
-      `${functionName}() expected temporalDither from createTemporalDither()`,
-    );
-  }
-  return state;
-}
-
-function rejectChangedHistory(
-  state: TemporalDitherState,
-  rgba: RGBAInput,
-  format: Format,
-  errors: Float32Array,
-): void {
-  const temporal = getTemporalDitherState(state, "applyPalette");
-  if (!temporal.changeDetection) return;
-
-  const previousFrame = previousFrames.get(temporal);
-  if (!previousFrame?.hasFrame) return;
-
-  const channels = temporalDitherChannels(format);
-  const pixelThresholdSq =
-    temporal.changeDetection.pixelThreshold *
-    temporal.changeDetection.pixelThreshold;
-  let changedPixels = 0;
-
-  for (let i = 0, j = 0; i < rgba.length; i += 4, j += channels) {
-    let distance = channelDistanceSq(rgba, previousFrame.bytes, i, j, 0);
-    distance += channelDistanceSq(rgba, previousFrame.bytes, i, j, 1);
-    distance += channelDistanceSq(rgba, previousFrame.bytes, i, j, 2);
-    if (channels === 4) {
-      distance += channelDistanceSq(rgba, previousFrame.bytes, i, j, 3);
-    }
-
-    if (distance > pixelThresholdSq) {
-      changedPixels++;
-      clearPixelError(errors, j, channels);
-    }
-  }
-
-  const pixelCount = previousFrame.bytes.length / channels;
-  if (
-    pixelCount > 0 &&
-    changedPixels / pixelCount >= temporal.changeDetection.sceneChangeRatio
-  ) {
-    errors.fill(0);
-  }
-}
-
-function channelDistanceSq(
-  rgba: RGBAInput,
-  previous: Uint8Array,
-  rgbaOffset: number,
-  previousOffset: number,
-  channel: number,
-): number {
-  const diff =
-    byteAt(rgba, rgbaOffset + channel) -
-    byteAt(previous, previousOffset + channel);
-  return diff * diff;
-}
-
-function clearPixelError(
-  errors: Float32Array,
-  offset: number,
-  channels: number,
-): void {
-  errors[offset] = 0;
-  errors[offset + 1] = 0;
-  errors[offset + 2] = 0;
-  if (channels === 4) errors[offset + 3] = 0;
 }
 
 function copySourceFrame(

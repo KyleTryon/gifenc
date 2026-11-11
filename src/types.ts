@@ -147,13 +147,14 @@ export type PrequantizeOptions = {
  */
 export type TemporalDitherChangeDetectionOptions = {
   /**
-   * Euclidean color-distance threshold for rejecting a pixel's carried error.
+   * Euclidean source color distance from the previous frame above which a
+   * pixel ignores its temporal history.
    *
    * Defaults to `48`.
    */
   pixelThreshold?: number;
   /**
-   * Changed-pixel ratio that clears all carried error for the frame.
+   * Changed-pixel ratio that drops all temporal history for the frame.
    *
    * Defaults to `0.75`.
    */
@@ -177,25 +178,26 @@ export type TemporalDitherOptions = {
    */
   format?: Format;
   /**
-   * Multiplier for the previous frame's carried quantization error.
+   * How strongly static pixels keep their previous frame's color.
    *
-   * Defaults to `1`.
+   * A pixel keeps its previous color when that color is no worse than the best
+   * match by more than `0.12 * strength` of the distance between the two
+   * colors. `0` only breaks exact ties. Defaults to `1`.
    */
   strength?: number;
   /**
-   * Amount of newly computed quantization error to carry into the next frame.
-   *
-   * Defaults to `0.75`.
+   * @deprecated Ignored. Temporal dithering no longer carries quantization
+   * error between frames. Still validated for compatibility.
    */
   decay?: number;
   /**
-   * Maximum absolute carried error per channel.
-   *
-   * Defaults to `128`.
+   * @deprecated Ignored. Temporal dithering no longer carries quantization
+   * error between frames. Still validated for compatibility.
    */
   maxError?: number;
   /**
-   * Reject carried error when source pixels change sharply.
+   * Ignore temporal history for pixels whose source changes sharply, and drop
+   * all history when most of the frame changes.
    *
    * Defaults to `true`.
    */
@@ -225,19 +227,19 @@ export type TemporalDitherState = {
    */
   readonly height: number;
   /**
-   * Palette lookup format used to size the carried error buffer.
+   * Palette lookup format used to size the temporal history.
    */
   readonly format: Format;
   /**
-   * Multiplier for the previous frame's carried quantization error.
+   * How strongly static pixels keep their previous frame's color.
    */
   readonly strength: number;
   /**
-   * Amount of newly computed quantization error to carry into the next frame.
+   * @deprecated Ignored; retained for compatibility.
    */
   readonly decay: number;
   /**
-   * Maximum absolute carried error per channel.
+   * @deprecated Ignored; retained for compatibility.
    */
   readonly maxError: number;
   /**
@@ -250,8 +252,7 @@ export type TemporalDitherState = {
         readonly sceneChangeRatio: number;
       };
   /**
-   * Clear carried error and previous-frame history before starting a new
-   * animation sequence.
+   * Clear previous-frame history before starting a new animation sequence.
    */
   reset(): void;
 };
@@ -291,7 +292,7 @@ export type ApplyPaletteOptions = {
    */
   serpentine?: boolean;
   /**
-   * Carry quantization error across frames.
+   * Stabilize colors across frames so static areas do not flicker.
    *
    * Create this once per animation with {@link createTemporalDither}, then pass
    * the same state while mapping each frame.

@@ -21,8 +21,6 @@ const SKY_ROI = {
 };
 const SOFT_TEMPORAL_OPTIONS = {
   strength: 0.45,
-  decay: 0.6,
-  maxError: 48,
   changeDetection: {
     pixelThreshold: 24,
   },
@@ -1387,12 +1385,6 @@ function temporalSettingsLabel(variant) {
   const settings = [];
   if (variant.temporal.strength != null) {
     settings.push(`strength ${formatNumber(variant.temporal.strength, 2)}`);
-  }
-  if (variant.temporal.decay != null) {
-    settings.push(`decay ${formatNumber(variant.temporal.decay, 2)}`);
-  }
-  if (variant.temporal.maxError != null) {
-    settings.push(`max error ${formatNumber(variant.temporal.maxError, 0)}`);
   }
   if (variant.temporal.changeDetection?.pixelThreshold != null) {
     settings.push(
