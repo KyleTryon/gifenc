@@ -10,7 +10,11 @@ import type { Color, DistanceFn, Palette } from "../types.js";
  *
  * @param palette - Palette to mutate.
  * @param knownColors - Preferred colors to snap into the palette.
- * @param threshold - Maximum Euclidean RGB distance for replacement.
+ * Distances use the palette's channels: RGB for RGB palettes, RGBA for RGBA
+ * palettes (RGB known colors count as opaque). Each palette entry is matched
+ * by at most one known color, and an exact match keeps its entry unchanged.
+ *
+ * @param threshold - Maximum Euclidean distance for replacement.
  */
 export function snapColorsToPalette(
   palette: Palette,

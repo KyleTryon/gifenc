@@ -72,11 +72,23 @@ export function createPaletteLookup(
     cs[s] = channelAt(i, restC);
   }
 
-  const transparent: number[] = [];
+  // Fully transparent entries, with their RGB, for alpha-0 queries.
+  const transparentList: number[] = [];
   if (hasAlpha) {
     for (let i = 0; i < length; i++) {
-      if (channelAt(i, 3) === 0) transparent.push(i);
+      if (channelAt(i, 3) === 0) transparentList.push(i);
     }
+  }
+  const transparentCount = transparentList.length;
+  const transparent = Uint16Array.from(transparentList);
+  const transparentReds = new Int32Array(transparentCount);
+  const transparentGreens = new Int32Array(transparentCount);
+  const transparentBlues = new Int32Array(transparentCount);
+  for (let t = 0; t < transparentCount; t++) {
+    const i = transparent[t] ?? 0;
+    transparentReds[t] = channelAt(i, 0);
+    transparentGreens[t] = channelAt(i, 1);
+    transparentBlues[t] = channelAt(i, 2);
   }
 
   // starts[v] is the first sorted position whose leading channel is >= v.
@@ -99,7 +111,7 @@ export function createPaletteLookup(
   }
 
   function nearestRGBA(r: number, g: number, b: number, a = 255): number {
-    if (a === 0 && transparent.length) return nearestTransparent(r, g, b);
+    if (a === 0 && transparentCount) return nearestTransparent(r, g, b);
     return search(
       pick(leadChannel, r, g, b, a),
       pick(restA, r, g, b, a),
@@ -112,14 +124,15 @@ export function createPaletteLookup(
   function nearestTransparent(r: number, g: number, b: number): number {
     let nearest = 0;
     let distance = Infinity;
-    for (const i of transparent) {
-      const dr = channelAt(i, 0) - r;
-      const dg = channelAt(i, 1) - g;
-      const db = channelAt(i, 2) - b;
+    for (let t = 0; t < transparentCount; t++) {
+      const dr = (transparentReds[t] ?? 0) - r;
+      const dg = (transparentGreens[t] ?? 0) - g;
+      const db = (transparentBlues[t] ?? 0) - b;
       const next = dr * dr + dg * dg + db * db;
+      // Entries are in index order, so <= keeps the highest index on ties.
       if (next <= distance) {
         distance = next;
-        nearest = i;
+        nearest = transparent[t] ?? 0;
       }
     }
     return nearest;

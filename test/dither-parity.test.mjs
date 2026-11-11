@@ -5,8 +5,9 @@ import { applyPalette, createTemporalDither } from "../dist/gifenc.mjs";
 
 // The rgb565 spatial digest was produced by the original full-frame diffusion
 // implementation and must not change. The rgba4444 spatial digest differs from
-// it only where a fully transparent target now maps to the palette's
-// transparent entry instead of a visible color. Temporal digests pin the
+// it only because fully transparent targets now map to the palette's
+// transparent entry, and pixels mapped to a fully transparent entry diffuse
+// only their alpha error, not invisible RGB. Temporal digests pin the
 // temporal stabilization behavior, including scene changes and reset.
 const GOLDEN = {
   rgb565: {
@@ -15,9 +16,9 @@ const GOLDEN = {
       "b217d41855de42593c8756117f37755e49153547d1ffdf22232e9eea8d791e6f",
   },
   rgba4444: {
-    spatial: "24deece767cc7b401187e1bfe9aa8048b0fbb4f201617b312fd2487ee57ed02d",
+    spatial: "7859d5ccc8fd7bbee639869c421fd09add75d97365ae94bbbd69077af086b932",
     temporal:
-      "4f8e28baf102877bcc6f32beae29ca4d3fbdd0ddd1e2c64bf4fd3679bbd3efc6",
+      "9e8959766fb0e748acc643100d286256ce3b436d473136150f634476601f0a44",
   },
 };
 

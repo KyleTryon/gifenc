@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   applyPalette,
   createPaletteMapper,
+  createTemporalDither,
   quantize,
 } from "../dist/gifenc.mjs";
 
@@ -137,4 +138,61 @@ test("lookup matches a linear scan for skewed and tie-heavy palettes", () => {
       expected,
     );
   }
+});
+
+const transparencyPalette = [
+  [0, 0, 0, 0],
+  [0, 0, 0, 255],
+  [128, 128, 128, 255],
+  [255, 255, 255, 255],
+];
+
+test("dithering does not bleed a transparent pixel's RGB into neighbors", () => {
+  const row = (rgb) =>
+    new Uint8Array([
+      rgb,
+      rgb,
+      rgb,
+      0,
+      128,
+      128,
+      128,
+      255,
+      128,
+      128,
+      128,
+      255,
+      128,
+      128,
+      128,
+      255,
+    ]);
+  for (const rgb of [0, 255]) {
+    assert.deepEqual(
+      Array.from(
+        applyPalette(row(rgb), transparencyPalette, {
+          format: "rgba4444",
+          dither: true,
+          width: 4,
+        }),
+      ),
+      [0, 2, 2, 2],
+    );
+  }
+});
+
+test("temporal history never overrides a transparent target", () => {
+  const temporalDither = createTemporalDither({
+    width: 1,
+    height: 1,
+    format: "rgba4444",
+    changeDetection: false,
+  });
+  const map = (pixel) =>
+    applyPalette(new Uint8Array(pixel), transparencyPalette, {
+      format: "rgba4444",
+      temporalDither,
+    })[0];
+  assert.equal(map([255, 255, 255, 255]), 3);
+  assert.equal(map([255, 255, 255, 0]), 0);
 });

@@ -267,6 +267,11 @@ Maps RGBA pixels to palette indexes.
 - `options.serpentine`: alternates scan direction per row.
 - `options.temporalDither`: state returned by `createTemporalDither()`.
 
+With `"rgba4444"`, a fully transparent pixel maps to the palette's nearest fully
+transparent entry when there is one, since its RGB is invisible (`quantize`
+clears transparent entries' RGB by default). When dithering, a pixel mapped to a
+fully transparent entry diffuses only its alpha error, not its invisible RGB.
+
 Returns a `Uint8Array` with one palette index per pixel.
 
 ### `createPaletteMapper(palette, options)`

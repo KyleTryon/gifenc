@@ -144,8 +144,11 @@ export function applyPaletteDither(
         // pixels when it is nearly as close as the best match. Spatial
         // diffusion then absorbs the small extra error, so dither patterns
         // stop churning between frames without shifting local average color.
+        // Fully transparent targets always take the palette's transparent
+        // entry (see createPaletteLookup); history must not override that.
         if (
           remap &&
+          !(hasAlpha && a === 0) &&
           (temporal.pixelThresholdSq === Infinity ||
             sourceDistanceSq(
               rgba,
@@ -204,6 +207,10 @@ export function applyPaletteDither(
       index[idx] = paletteIndex;
 
       if (pixels) {
+        // A fully transparent output shows no color, so its RGB difference is
+        // not a visible error and must not bleed into opaque neighbors.
+        const chosenAlpha = alphas[paletteIndex] ?? 0xff;
+        const invisible = hasAlpha && chosenAlpha === 0;
         diffuseError(
           pixels,
           channels,
@@ -213,10 +220,10 @@ export function applyPaletteDither(
           y + 1 < resolvedHeight ? rowLength - rowOffset : -1,
           reverse,
           ditherStrength,
-          r - (reds[paletteIndex] ?? 0),
-          g - (greens[paletteIndex] ?? 0),
-          b - (blues[paletteIndex] ?? 0),
-          hasAlpha ? a - (alphas[paletteIndex] ?? 0xff) : 0,
+          invisible ? 0 : r - (reds[paletteIndex] ?? 0),
+          invisible ? 0 : g - (greens[paletteIndex] ?? 0),
+          invisible ? 0 : b - (blues[paletteIndex] ?? 0),
+          hasAlpha ? a - chosenAlpha : 0,
         );
       }
     }
