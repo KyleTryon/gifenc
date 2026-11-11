@@ -19,32 +19,47 @@ export function snapColorsToPalette(
 ): void {
   if (!palette.length || !knownColors.length) return;
 
-  const paletteRGB = palette.map(toRGB);
-  const thresholdSq = threshold * threshold;
   const dim = colorAt(palette, 0).length;
+  // Compare in the palette's own channels, so alpha keeps a transparent entry
+  // from being snapped to an opaque known color and vice versa.
+  const current = palette.map((color) => toDim(color, dim));
+  // Each palette entry may serve at most one known color. An exact match
+  // claims its entry too, so a later, merely similar known color cannot
+  // overwrite a known color that is already present.
+  const claimed = new Uint8Array(palette.length);
+  const thresholdSq = threshold * threshold;
   for (let i = 0; i < knownColors.length; i++) {
-    let color: Color = colorAt(knownColors, i);
-    if (color.length < dim) {
-      // palette is RGBA, known is RGB
-      color = [red(color), green(color), blue(color), 0xff];
-    } else if (color.length > dim) {
-      // palette is RGB, known is RGBA
-      color = toRGB(color);
-    } else {
-      // make sure we always copy known colors
-      color = cloneColor(color);
+    const color = toDim(colorAt(knownColors, i), dim);
+    let idx = -1;
+    let distanceSq = Infinity;
+    for (let j = 0; j < current.length; j++) {
+      if (claimed[j]) continue;
+      const distance = euclideanDistanceSquared(color, colorAt(current, j));
+      if (distance < distanceSq) {
+        distanceSq = distance;
+        idx = j;
+      }
     }
-    const r = nearestColorIndexWithDistance(
-      paletteRGB,
-      toRGB(color),
-      euclideanDistanceSquared,
-    );
-    const idx = r[0];
-    const distanceSq = r[1];
-    if (idx >= 0 && distanceSq > 0 && distanceSq <= thresholdSq) {
+    if (idx < 0 || distanceSq > thresholdSq) continue;
+    claimed[idx] = 1;
+    if (distanceSq > 0) {
       palette[idx] = color;
+      current[idx] = cloneColor(color);
     }
   }
+}
+
+function toDim(color: readonly number[], dim: number): Color {
+  if (color.length < dim) {
+    // palette is RGBA, known is RGB
+    return [red(color), green(color), blue(color), 0xff];
+  }
+  if (color.length > dim) {
+    // palette is RGB, known is RGBA
+    return toRGB(color);
+  }
+  // make sure we always copy known colors
+  return cloneColor(color);
 }
 
 /**
