@@ -36,20 +36,25 @@ export function snapColorsToPalette(
     const color = toDim(colorAt(knownColors, i), dim);
     let idx = -1;
     let distanceSq = Infinity;
+    let present = false;
     for (let j = 0; j < current.length; j++) {
-      if (claimed[j]) continue;
       const distance = euclideanDistanceSquared(color, colorAt(current, j));
-      if (distance < distanceSq) {
+      if (distance === 0) {
+        // Already present (possibly claimed by a repeated known color):
+        // claim it and leave every other entry alone.
+        present = true;
+        claimed[j] = 1;
+        break;
+      }
+      if (!claimed[j] && distance < distanceSq) {
         distanceSq = distance;
         idx = j;
       }
     }
-    if (idx < 0 || distanceSq > thresholdSq) continue;
+    if (present || idx < 0 || distanceSq > thresholdSq) continue;
     claimed[idx] = 1;
-    if (distanceSq > 0) {
-      palette[idx] = color;
-      current[idx] = cloneColor(color);
-    }
+    palette[idx] = color;
+    current[idx] = cloneColor(color);
   }
 }
 

@@ -145,3 +145,22 @@ test("nearestColorIndex compares shared channels of RGB and RGBA colors", () => 
     1,
   );
 });
+
+test("snapColorsToPalette ignores repeated known colors", () => {
+  const palette = [
+    [1, 1, 1],
+    [5, 5, 5],
+  ];
+  snapColorsToPalette(
+    palette,
+    [
+      [1, 1, 1],
+      [1, 1, 1],
+    ],
+    10,
+  );
+  assert.deepEqual(palette, [
+    [1, 1, 1],
+    [5, 5, 5],
+  ]);
+});
